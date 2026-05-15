@@ -1,0 +1,21 @@
+{
+  "name": "door-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "create-assistant": "tsx scripts/create-assistant.ts",
+    "start": "tsx src/server/index.ts"
+  },
+  "dependencies": {
+    "@vapi-ai/server-sdk": "latest",
+    "dotenv": "^16.0.0",
+    "express": "^5.2.1",
+    "googleapis": "^171.4.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
