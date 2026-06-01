@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { verifyIdentity } from "../services/auth.js";
 import { checkRateLimit } from "../services/rateLimiter.js";
-import { clearCache, getChannelId, getChannelToken } from "../services/sheets.js";
+import { clearCache, getChannelId, getChannelToken, getTodaysWord } from "../services/sheets.js";
 
 const router = Router();
 
@@ -104,6 +104,8 @@ router.post("/sheets-webhook", (req: Request, res: Response) => {
   if (state === "update" || state === "change") {
     clearCache();
     console.log("Sheets cache cleared via push notification");
+    // Delay re-fetch to allow Sheets API to propagate the change
+    setTimeout(() => getTodaysWord().catch(() => {}), 4000);
   }
 
   res.sendStatus(200);
