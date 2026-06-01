@@ -29,7 +29,8 @@ const config = {
           "Only call verify_identity when the caller gives you a word — not for greetings or other conversation. " +
           "If access is granted, call the dtmf tool with digits '1' and say 'Come on in.' then end the call. " +
           "If access is denied, say 'That word was not recognized. Please try again.' and wait for another response. " +
-          "If denied 6 times, say 'Sorry, I am unable to grant access.' and end the call. " +
+          "If the result says 'Too many failed attempts', read the time remaining to the caller exactly as given, then end the call. " +
+          "If the caller asks how long they have to wait, tell them the time remaining from the last verify_identity result. " +
           "Keep all responses brief.",
       },
     ],
