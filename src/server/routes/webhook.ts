@@ -88,16 +88,19 @@ router.post("/webhook", async (req: Request, res: Response) => {
 router.post("/sheets-webhook", (req: Request, res: Response) => {
   const incomingToken = req.headers["x-goog-channel-token"];
   const incomingChannelId = req.headers["x-goog-channel-id"];
+  const state = req.headers["x-goog-resource-state"];
   const token = getChannelToken();
   const channelId = getChannelId();
 
+  console.log("sheets-webhook received:", { incomingChannelId, incomingToken, state, expectedChannelId: channelId, tokenMatch: incomingToken === token });
+
   if (!token || incomingToken !== token || incomingChannelId !== channelId) {
+    console.warn("sheets-webhook rejected: token or channel ID mismatch");
     res.sendStatus(401);
     return;
   }
 
   // "sync" is Google's initial handshake when the watch is registered — ignore it
-  const state = req.headers["x-goog-resource-state"];
   if (state === "update" || state === "change") {
     clearCache();
     console.log("Sheets cache cleared via push notification");
