@@ -39,6 +39,13 @@ router.post("/webhook", async (req: Request, res: Response) => {
 
   const input: string = typeof args.input === "string" ? args.input : "";
 
+  if (input.length > 100) {
+    res.json({
+      results: [{ toolCallId: toolCall.id, result: "Access denied." }],
+    });
+    return;
+  }
+
   const rateLimit = checkRateLimit(callerNumber);
   if (!rateLimit.allowed) {
     const mins = Math.floor(rateLimit.msRemaining / 60000);
