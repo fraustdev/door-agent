@@ -35,11 +35,11 @@ export function getChannelId(): string | null {
   return activeChannel?.id ?? null;
 }
 
-export async function getTodaysWord(): Promise<string> {
+export async function getTodaysWord(force = false): Promise<string> {
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const now = Date.now();
 
-  if (cache?.date === today && now - cache.fetchedAt < CACHE_TTL_MS) return cache.word;
+  if (!force && cache?.date === today && now - cache.fetchedAt < CACHE_TTL_MS) return cache.word;
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,

@@ -111,8 +111,8 @@ router.post("/sheets-webhook", (req: Request, res: Response) => {
   if (state === "update" || state === "change") {
     clearCache();
     console.log("Sheets cache cleared via push notification");
-    // Delay re-fetch to allow Sheets API to propagate the change
-    setTimeout(() => getTodaysWord().catch(() => {}), 4000);
+    // Force re-fetch after delay to allow Sheets API to propagate the change
+    setTimeout(() => getTodaysWord(true).catch(() => {}), 4000);
   }
 
   res.sendStatus(200);
