@@ -51,13 +51,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
     const mins = Math.floor(rateLimit.msRemaining / 60000);
     const secs = Math.ceil((rateLimit.msRemaining % 60000) / 1000);
     const timeLeft = mins > 0 ? `${mins} minute${mins !== 1 ? "s" : ""} and ${secs} second${secs !== 1 ? "s" : ""}` : `${secs} second${secs !== 1 ? "s" : ""}`;
-    console.log({
-      timestamp: new Date().toISOString(),
-      callerNumber,
-      input,
-      result: "rate_limited",
-      msRemaining: rateLimit.msRemaining,
-    });
+    console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}] RATE_LIMITED | ${callerNumber} | "${input}" | retry in ${timeLeft}`);
     res.json({
       results: [{ toolCallId: toolCall.id, result: `Access denied. Too many failed attempts. Try again in ${timeLeft}.` }],
     });
@@ -75,12 +69,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
     return;
   }
 
-  console.log({
-    timestamp: new Date().toISOString(),
-    callerNumber,
-    input,
-    result,
-  });
+  console.log(`[${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}] ${result.toUpperCase()} | ${callerNumber} | "${input}"`);
 
   res.json({
     results: [
@@ -99,10 +88,7 @@ router.post("/sheets-webhook", (req: Request, res: Response) => {
   const token = getChannelToken();
   const channelId = getChannelId();
 
-  console.log("sheets-webhook received:", { incomingChannelId, incomingToken, state, expectedChannelId: channelId, tokenMatch: incomingToken === token });
-
   if (!token || incomingToken !== token || incomingChannelId !== channelId) {
-    console.warn("sheets-webhook rejected: token or channel ID mismatch");
     res.sendStatus(401);
     return;
   }
