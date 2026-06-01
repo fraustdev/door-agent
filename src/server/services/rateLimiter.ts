@@ -1,5 +1,6 @@
-const attempts = new Map<string, { count: number; lockedUntil?: number }>();
+const attempts = new Map<string, { count: number; windowStart: number; lockedUntil?: number }>();
 
+const WINDOW_MS = 5 * 60 * 1000;
 const LOCKOUT_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 6;
 
@@ -19,12 +20,18 @@ export function checkRateLimit(callerNumber: string): RateLimitResult {
   const current = attempts.get(callerNumber);
 
   if (!current) {
-    attempts.set(callerNumber, { count: 1 });
+    attempts.set(callerNumber, { count: 1, windowStart: now });
     return { allowed: true };
   }
 
   if (current.lockedUntil) {
     return { allowed: false, msRemaining: current.lockedUntil - now };
+  }
+
+  // Attempt window expired without hitting the limit → fresh start
+  if (now - current.windowStart > WINDOW_MS) {
+    attempts.set(callerNumber, { count: 1, windowStart: now });
+    return { allowed: true };
   }
 
   if (current.count >= MAX_ATTEMPTS) {
