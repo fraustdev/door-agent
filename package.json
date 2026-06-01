@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "create-assistant": "tsx scripts/create-assistant.ts",
-    "start": "tsx src/server/index.ts"
+    "build": "tsc",
+    "start": "node dist/server/index.js",
+    "dev": "tsx src/server/index.ts",
+    "create-assistant": "tsx scripts/create-assistant.ts"
   },
   "dependencies": {
     "@vapi-ai/server-sdk": "latest",

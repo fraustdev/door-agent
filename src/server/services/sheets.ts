@@ -3,7 +3,9 @@ import { google } from "googleapis";
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID!;
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: "credentials.json",
+  ...(process.env.GOOGLE_CREDENTIALS
+    ? { credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS) }
+    : { keyFile: "credentials.json" }),
   scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
 });
 
