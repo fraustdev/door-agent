@@ -1,13 +1,14 @@
 import { Router, Request, Response } from "express";
 import { verifyIdentity } from "../services/auth.js";
 import { checkRateLimit } from "../services/rateLimiter.js";
+import { clearCache, getChannelId, getChannelToken } from "../services/sheets.js";
 
 const router = Router();
 
 router.post("/webhook", async (req: Request, res: Response) => {
   // Verify Vapi shared secret to reject unauthenticated callers
   const secret = process.env.VAPI_SERVER_SECRET;
-  if (secret && req.headers["x-vapi-secret"] !== secret) {
+  if (!secret || req.headers["x-vapi-secret"] !== secret) {
     res.sendStatus(401);
     return;
   }
@@ -82,6 +83,27 @@ router.post("/webhook", async (req: Request, res: Response) => {
       },
     ],
   });
+});
+
+router.post("/sheets-webhook", (req: Request, res: Response) => {
+  const incomingToken = req.headers["x-goog-channel-token"];
+  const incomingChannelId = req.headers["x-goog-channel-id"];
+  const token = getChannelToken();
+  const channelId = getChannelId();
+
+  if (!token || incomingToken !== token || incomingChannelId !== channelId) {
+    res.sendStatus(401);
+    return;
+  }
+
+  // "sync" is Google's initial handshake when the watch is registered — ignore it
+  const state = req.headers["x-goog-resource-state"];
+  if (state === "update" || state === "change") {
+    clearCache();
+    console.log("Sheets cache cleared via push notification");
+  }
+
+  res.sendStatus(200);
 });
 
 export default router;
