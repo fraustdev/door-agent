@@ -16,7 +16,7 @@ function levenshtein(a: string, b: string): number {
 }
 
 function allowedDistance(word: string): number {
-  return word.length <= 3 ? 0 : 1;
+  return word.length <= 4 ? 0 : 1;
 }
 
 export async function verifyIdentity(

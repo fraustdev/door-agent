@@ -5,6 +5,7 @@ import { registerWatch } from "./services/sheets.js";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
+app.get("/ping", (_req, res) => res.sendStatus(200));
 app.use(webhookRouter);
 
 const PORT = process.env.PORT ?? 3000;
