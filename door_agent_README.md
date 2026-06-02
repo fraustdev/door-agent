@@ -173,8 +173,6 @@ Use the ngrok URL as `WEBHOOK_URL` and `SERVER_URL` in `.env`, then re-run `npm 
 ---
 
 ## Security notes
-
-- `credentials.json` and `.env` are gitignored — never commit them
 - The webhook validates the `x-vapi-secret` header on every request and rejects anything that doesn't match
 - Callers are rate-limited to 6 attempts per 5-minute window, then locked out for 5 minutes
 - Words of 4 letters or fewer require an exact spoken match; words of 5+ letters allow 1 character of difference (for accent and noise tolerance)
