@@ -34,6 +34,13 @@ app.put("/word", async (req, res) => {
   }
 });
 
+app.post("/calendar/refresh", async (req, res) => {
+  const key = process.env.DASHBOARD_API_KEY;
+  if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
+  await refreshCalendarData().catch((err) => console.error("Manual calendar refresh failed:", err));
+  res.json({ ok: true, visitors: getAllVisitors().length });
+});
+
 app.get("/visitors", (req, res) => {
   const key = process.env.DASHBOARD_API_KEY;
   if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }

@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [connError, setConnError] = useState(false)
   const [calendarFeedback, setCalendarFeedback] = useState<string | null>(null)
+  const [calendarRefreshing, setCalendarRefreshing] = useState(false)
 
   // Word editing
   const [editingWord, setEditingWord] = useState(false)
@@ -128,6 +129,13 @@ export default function Dashboard() {
       window.history.replaceState({}, '', '/')
     }
   }, [])
+
+  const forceCalendarRefresh = async () => {
+    setCalendarRefreshing(true)
+    await fetch('/api/calendar', { method: 'POST' }).catch(() => {})
+    await refresh()
+    setCalendarRefreshing(false)
+  }
 
   const disconnectCalendar = async (email: string) => {
     await fetch('/api/calendars', {
@@ -457,9 +465,18 @@ export default function Dashboard() {
 
             {/* Visitor schedule — week view */}
             <div className="rounded-2xl glass px-6 py-6">
-              <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em] mb-4">
-                Visitor Schedule
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em]">
+                  Visitor Schedule
+                </p>
+                <button
+                  onClick={forceCalendarRefresh}
+                  disabled={calendarRefreshing}
+                  className="text-[10px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5 disabled:opacity-40"
+                >
+                  {calendarRefreshing ? 'Refreshing…' : '↻ Refresh'}
+                </button>
+              </div>
               {visitors.length === 0 ? (
                 <p className="text-[13px] text-white/25 italic">No visitors this week</p>
               ) : (
@@ -540,7 +557,7 @@ export default function Dashboard() {
           </div>
 
           {/* Access log */}
-          <div className="col-span-2 rounded-2xl glass px-6 py-6 flex flex-col">
+          <div className="col-span-2 rounded-2xl glass px-6 py-6 flex flex-col self-start">
             <div className="flex items-center justify-between mb-5">
               <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em]">
                 Access Log
@@ -548,7 +565,7 @@ export default function Dashboard() {
               <p className="text-[10px] text-white/20">Last 50 attempts · auto-refreshes every 5s</p>
             </div>
 
-            <div className="space-y-1.5 overflow-y-auto flex-1 max-h-[520px] pr-0.5">
+            <div className="space-y-1.5 overflow-y-auto max-h-[560px] pr-0.5">
               {logs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <p className="text-[32px] mb-3">🔇</p>
