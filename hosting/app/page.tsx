@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import type { AccessLogRow, StatusData, DayStat } from '../lib/types'
+import type { AccessLogRow, StatusData, DayStat, VisitorWindow, CalendarConnection } from '../lib/types'
 
 const WeeklyChart = dynamic(() => import('./WeeklyChart'), { ssr: false })
 
@@ -44,8 +44,11 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<AccessLogRow[]>([])
   const [status, setStatus] = useState<StatusData | null>(null)
   const [stats, setStats] = useState<DayStat[]>([])
+  const [visitors, setVisitors] = useState<VisitorWindow[]>([])
+  const [calendars, setCalendars] = useState<CalendarConnection[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [connError, setConnError] = useState(false)
+  const [calendarFeedback, setCalendarFeedback] = useState<string | null>(null)
 
   // Word editing
   const [editingWord, setEditingWord] = useState(false)
@@ -74,20 +77,47 @@ export default function Dashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const [lr, sr, str] = await Promise.all([
+      const [lr, sr, str, vr, cr] = await Promise.all([
         fetch('/api/logs'),
         fetch('/api/status'),
         fetch('/api/stats'),
+        fetch('/api/visitors'),
+        fetch('/api/calendars'),
       ])
       if (lr.ok)  setLogs(await lr.json())
       if (sr.ok)  setStatus(await sr.json())
       if (str.ok) setStats(await str.json())
+      if (vr.ok)  setVisitors(await vr.json())
+      if (cr.ok)  setCalendars(await cr.json())
       setLastUpdated(new Date())
       setConnError(false)
     } catch {
       setConnError(true)
     }
   }, [])
+
+  // Handle OAuth callback feedback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get('calendar_connected')
+    const error = params.get('calendar_error')
+    if (connected) {
+      setCalendarFeedback(`✓ ${decodeURIComponent(connected)} connected`)
+      window.history.replaceState({}, '', '/')
+    } else if (error) {
+      setCalendarFeedback(`Failed to connect: ${error}`)
+      window.history.replaceState({}, '', '/')
+    }
+  }, [])
+
+  const disconnectCalendar = async (email: string) => {
+    await fetch('/api/calendars', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    await refresh()
+  }
 
   useEffect(() => {
     refresh()
@@ -404,6 +434,77 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Today's visitors */}
+            <div className="rounded-2xl glass px-6 py-6">
+              <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em] mb-4">
+                Today&apos;s Visitors
+              </p>
+              {visitors.length === 0 ? (
+                <p className="text-[13px] text-white/25 italic">No visitor access windows</p>
+              ) : (
+                <div className="space-y-2">
+                  {visitors.map((v, i) => (
+                    <div key={i} className="glass-row rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                          style={v.active
+                            ? { background: 'rgba(173,226,93,0.18)', border: '1px solid rgba(173,226,93,0.5)', color: '#cfffb3' }
+                            : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }
+                          }
+                        >
+                          {v.active ? 'Active' : 'Upcoming'}
+                        </span>
+                        <p className="text-[13px] text-white/85 font-medium capitalize">{v.firstName}</p>
+                      </div>
+                      <p className="text-[11px] text-white/40 truncate">{v.meetingTitle}</p>
+                      <p className="text-[10px] text-white/25 mt-1">
+                        {new Date(v.windowStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {' – '}
+                        {new Date(v.windowEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Connected calendars */}
+            <div className="rounded-2xl glass px-6 py-6">
+              <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em] mb-4">
+                Calendars
+              </p>
+              {calendarFeedback && (
+                <p className="text-[11px] mb-3" style={{ color: calendarFeedback.startsWith('✓') ? '#cfffb3' : '#fca5a5' }}>
+                  {calendarFeedback}
+                </p>
+              )}
+              <div className="space-y-2 mb-3">
+                {calendars.map(c => (
+                  <div key={c.email} className="glass-row rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[12px] text-white/80 truncate">{c.display_name ?? c.email}</p>
+                      <p className="text-[10px] text-white/30 truncate">{c.email}</p>
+                    </div>
+                    <button
+                      onClick={() => disconnectCalendar(c.email)}
+                      className="text-[10px] text-white/30 hover:text-red-400/70 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-red-400/10"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <a
+                href="/api/auth/google"
+                className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-[12px] font-medium transition-all"
+                style={{ background: 'rgba(59,112,128,0.25)', border: '1px solid rgba(59,112,128,0.45)', color: '#a8cfd8' }}
+              >
+                <span>+</span>
+                <span>Connect a calendar</span>
+              </a>
             </div>
           </div>
 

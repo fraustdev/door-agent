@@ -19,6 +19,24 @@ export interface StatusData {
   lockouts: LockoutInfo[]
 }
 
+export interface VisitorWindow {
+  firstName: string
+  displayName: string
+  meetingTitle: string
+  meetingStart: string
+  meetingEnd: string
+  windowStart: string
+  windowEnd: string
+  calendarOwner: string
+  active: boolean
+}
+
+export interface CalendarConnection {
+  email: string
+  display_name: string | null
+  created_at: string
+}
+
 export interface DayStat {
   date: string
   day: string
