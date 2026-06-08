@@ -12,7 +12,7 @@ const auth = new google.auth.GoogleAuth({
     ? { credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS) }
     : { keyFile: "credentials.json" }),
   scopes: [
-    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.readonly",
   ],
 });
@@ -53,6 +53,31 @@ export async function getTodaysWord(force = false): Promise<string> {
 
   cache = { word, date: today, fetchedAt: now };
   return word;
+}
+
+export async function setTodaysWord(word: string): Promise<void> {
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: "word_of_day!A:A",
+  });
+
+  const column = res.data.values ?? [];
+  const rowIndex = column.findIndex(
+    (r) => r[0]?.toString().toLowerCase() === today.toLowerCase()
+  );
+
+  if (rowIndex === -1) throw new Error(`No row found for ${today} in word_of_day sheet`);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `word_of_day!B${rowIndex + 1}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[word.toLowerCase().trim()]] },
+  });
+
+  cache = null;
 }
 
 export async function registerWatch(): Promise<void> {
