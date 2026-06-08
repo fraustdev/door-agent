@@ -64,7 +64,11 @@ export default function Dashboard() {
     if (word && word !== prevWord.current) {
       prevWord.current = word
       setWordImageLoaded(false)
-      setWordImageUrl(`https://source.unsplash.com/featured/800x600/?${encodeURIComponent(word)}`)
+      setWordImageUrl(null)
+      fetch(`/api/wordgif?word=${encodeURIComponent(word)}`)
+        .then(r => r.json())
+        .then(d => { if (d.url) setWordImageUrl(d.url) })
+        .catch(() => {})
     }
   }, [status?.currentWord])
 
