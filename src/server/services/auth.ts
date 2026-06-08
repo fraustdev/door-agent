@@ -1,5 +1,11 @@
 import { getTodaysWord } from "./sheets.js";
 
+export interface AuthResult {
+  outcome: "granted" | "denied";
+  wordExpected: string | null;
+  matchDistance: number | null;
+}
+
 function levenshtein(a: string, b: string): number {
   const dp: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
     Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
@@ -19,14 +25,15 @@ function allowedDistance(word: string): number {
   return word.length <= 4 ? 0 : 1;
 }
 
-export async function verifyIdentity(
-  input: string
-): Promise<"granted" | "denied"> {
+export async function verifyIdentity(input: string): Promise<AuthResult> {
   const normalized = input.toLowerCase().trim();
   const todaysWord = await getTodaysWord();
 
-  if (todaysWord && levenshtein(normalized, todaysWord) <= allowedDistance(todaysWord))
-    return "granted";
+  if (!todaysWord) {
+    return { outcome: "denied", wordExpected: null, matchDistance: null };
+  }
 
-  return "denied";
+  const matchDistance = levenshtein(normalized, todaysWord);
+  const outcome = matchDistance <= allowedDistance(todaysWord) ? "granted" : "denied";
+  return { outcome, wordExpected: todaysWord, matchDistance };
 }

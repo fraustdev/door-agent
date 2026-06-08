@@ -9,6 +9,7 @@
     "create-assistant": "tsx scripts/create-assistant.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.0",
     "@vapi-ai/server-sdk": "latest",
     "dotenv": "^16.0.0",
     "express": "^5.2.1",
