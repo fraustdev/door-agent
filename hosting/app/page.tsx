@@ -29,6 +29,25 @@ function maskCaller(id: string): string {
   return id
 }
 
+function groupVisitorsByDay(visitors: VisitorWindow[]): { label: string; date: string; visitors: VisitorWindow[] }[] {
+  const map = new Map<string, VisitorWindow[]>()
+  for (const v of visitors) {
+    const date = v.meetingStart.slice(0, 10)
+    if (!map.has(date)) map.set(date, [])
+    map.get(date)!.push(v)
+  }
+  const today = new Date().toISOString().slice(0, 10)
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, visitors]) => {
+      const label = date === today ? 'Today'
+        : date === tomorrow ? 'Tomorrow'
+        : new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+      return { label, date, visitors }
+    })
+}
+
 function todayStats(logs: AccessLogRow[]) {
   const start = new Date()
   start.setHours(0, 0, 0, 0)
@@ -436,35 +455,47 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Today's visitors */}
+            {/* Visitor schedule — week view */}
             <div className="rounded-2xl glass px-6 py-6">
               <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em] mb-4">
-                Today&apos;s Visitors
+                Visitor Schedule
               </p>
               {visitors.length === 0 ? (
-                <p className="text-[13px] text-white/25 italic">No visitor access windows</p>
+                <p className="text-[13px] text-white/25 italic">No visitors this week</p>
               ) : (
-                <div className="space-y-2">
-                  {visitors.map((v, i) => (
-                    <div key={i} className="glass-row rounded-xl px-4 py-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
-                          style={v.active
-                            ? { background: 'rgba(173,226,93,0.18)', border: '1px solid rgba(173,226,93,0.5)', color: '#cfffb3' }
-                            : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' }
-                          }
-                        >
-                          {v.active ? 'Active' : 'Upcoming'}
-                        </span>
-                        <p className="text-[13px] text-white/85 font-medium capitalize">{v.firstName}</p>
-                      </div>
-                      <p className="text-[11px] text-white/40 truncate">{v.meetingTitle}</p>
-                      <p className="text-[10px] text-white/25 mt-1">
-                        {new Date(v.windowStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {' – '}
-                        {new Date(v.windowEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div className="space-y-4 max-h-[320px] overflow-y-auto pr-0.5">
+                  {groupVisitorsByDay(visitors).map(({ label, date, visitors: dayVisitors }) => (
+                    <div key={date}>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
+                         style={{ color: label === 'Today' ? '#ADE25D' : 'rgba(255,255,255,0.35)' }}>
+                        {label}
                       </p>
+                      <div className="space-y-1.5">
+                        {dayVisitors.map((v, i) => (
+                          <div key={i} className="glass-row rounded-xl px-4 py-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {v.active && (
+                                  <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                                        style={{ background: '#ADE25D', boxShadow: '0 0 6px rgba(173,226,93,0.7)' }} />
+                                )}
+                                <p className="text-[13px] text-white/85 font-medium capitalize truncate">{v.firstName}</p>
+                              </div>
+                              <p className="text-[10px] text-white/30 shrink-0 tabular-nums">
+                                {new Date(v.meetingStart).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                {' – '}
+                                {new Date(v.meetingEnd).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              </p>
+                            </div>
+                            <p className="text-[10px] text-white/30 mt-1 truncate">{v.meetingTitle}</p>
+                            <p className="text-[9px] text-white/20 mt-0.5">
+                              Door access: {new Date(v.windowStart).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              {' – '}
+                              {new Date(v.windowEnd).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>

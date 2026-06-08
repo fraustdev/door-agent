@@ -87,7 +87,7 @@ async function refreshToken(refreshTokenValue: string): Promise<{ accessToken: s
 
 async function fetchVisitorWindows(accessToken: string, ownerEmail: string): Promise<VisitorWindow[]> {
   const timeMin = new Date(Date.now() - WINDOW_BEFORE_MS).toISOString();
-  const timeMax = new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString();
+  const timeMax = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
   url.searchParams.set("timeMin", timeMin);
@@ -98,22 +98,33 @@ async function fetchVisitorWindows(accessToken: string, ownerEmail: string): Pro
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) return [];
+
+  console.log(`  Calendar API status: ${res.status} for ${ownerEmail}`);
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`  Calendar API error: ${err}`);
+    return [];
+  }
 
   const data = await res.json();
+  console.log(`  Events returned: ${data.items?.length ?? 0} (timeMin: ${timeMin.slice(0,16)}, timeMax: ${timeMax.slice(0,16)})`);
   const windows: VisitorWindow[] = [];
 
   for (const event of data.items ?? []) {
-    // Skip cancelled events
-    if (event.status === "cancelled") continue;
+    const title = event.summary ?? "(no title)";
 
-    // Skip Google Meet / video calls — those are remote, not in-person visits
-    if (event.conferenceData?.conferenceSolution?.key?.type === "hangoutsMeet") continue;
+    if (event.status === "cancelled") {
+      console.log(`  SKIP (cancelled): "${title}"`); continue;
+    }
+    if (event.conferenceData?.conferenceSolution?.key?.type === "hangoutsMeet") {
+      console.log(`  SKIP (Google Meet): "${title}"`); continue;
+    }
+    if (!event.start?.dateTime) {
+      console.log(`  SKIP (all-day): "${title}"`); continue;
+    }
 
-    // Skip all-day events (no specific time means no door window to calculate)
-    if (!event.start?.dateTime) continue;
-
-    const names = extractNamesFromTitle(event.summary ?? "");
+    const names = extractNamesFromTitle(title);
+    console.log(`  EVENT: "${title}" → names: [${names.join(", ") || "none"}]`);
     if (names.length === 0) continue;
 
     const meetingStart = new Date(event.start.dateTime);
