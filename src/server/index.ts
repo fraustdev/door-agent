@@ -3,7 +3,6 @@ import express from "express";
 import webhookRouter from "./routes/webhook.js";
 import { registerWatch, getTodaysWord, setTodaysWord } from "./services/sheets.js";
 import { getActiveLockouts } from "./services/rateLimiter.js";
-import { logAttempt } from "./services/logger.js";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -32,49 +31,6 @@ app.put("/word", async (req, res) => {
     console.error("setTodaysWord failed:", err);
     res.status(500).json({ error: String(err) });
   }
-});
-
-// TwiML Twilio fetches when the outbound door-open call connects
-app.get("/door-twiml", (_req, res) => {
-  res.set("Content-Type", "text/xml");
-  res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Play digits="1"/><Pause length="1"/><Hangup/></Response>`);
-});
-
-app.post("/door/open", async (req, res) => {
-  const key = process.env.DASHBOARD_API_KEY;
-  if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
-
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const from = process.env.TWILIO_PHONE_NUMBER;
-  const to = process.env.CALLBOX_NUMBER;
-  const webhookUrl = process.env.WEBHOOK_URL;
-
-  if (!accountSid || !authToken || !from || !to || !webhookUrl) {
-    res.status(503).json({ error: "Door trigger not configured — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, CALLBOX_NUMBER" });
-    return;
-  }
-
-  const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-  const twilioRes = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,
-    {
-      method: "POST",
-      headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: to, From: from, Url: `${webhookUrl}/door-twiml` }).toString(),
-    }
-  );
-
-  if (!twilioRes.ok) {
-    const text = await twilioRes.text();
-    console.error("Twilio call failed:", text);
-    res.status(502).json({ error: "Twilio call failed" });
-    return;
-  }
-
-  console.log(`[${new Date().toISOString()}] DOOR_OPENED | manual trigger via dashboard`);
-  logAttempt({ caller_id: "dashboard", word_spoken: "[manual open]", word_expected: null, match_distance: null, granted: true, locked_out: false });
-  res.json({ ok: true });
 });
 
 app.use(webhookRouter);

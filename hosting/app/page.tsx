@@ -3,8 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { AccessLogRow, StatusData } from '../lib/types'
 
-type DoorState = 'idle' | 'confirm' | 'opening' | 'done' | 'error'
-
 function timeAgo(iso: string): string {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (s < 5) return 'just now'
@@ -51,10 +49,6 @@ export default function Dashboard() {
   const [wordSaving, setWordSaving] = useState(false)
   const [wordFeedback, setWordFeedback] = useState<'saved' | 'error' | null>(null)
   const wordInputRef = useRef<HTMLInputElement>(null)
-
-  // Door trigger
-  const [doorState, setDoorState] = useState<DoorState>('idle')
-  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -107,27 +101,6 @@ export default function Dashboard() {
     }
   }
 
-  const handleDoorClick = () => {
-    if (doorState === 'idle') {
-      setDoorState('confirm')
-      confirmTimerRef.current = setTimeout(() => setDoorState('idle'), 3000)
-    } else if (doorState === 'confirm') {
-      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current)
-      triggerDoor()
-    }
-  }
-
-  const triggerDoor = async () => {
-    setDoorState('opening')
-    try {
-      const res = await fetch('/api/door', { method: 'POST' })
-      setDoorState(res.ok ? 'done' : 'error')
-    } catch {
-      setDoorState('error')
-    }
-    setTimeout(() => setDoorState('idle'), 3000)
-  }
-
   const stats = todayStats(logs)
 
   return (
@@ -164,38 +137,6 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Door trigger */}
-          <button
-            onClick={handleDoorClick}
-            disabled={doorState === 'opening'}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 select-none disabled:opacity-60"
-            style={
-              doorState === 'confirm'
-                ? { background: 'rgba(245,158,11,0.25)', border: '1px solid rgba(245,158,11,0.6)', color: '#fcd34d', boxShadow: '0 0 20px rgba(245,158,11,0.3)' }
-                : doorState === 'done'
-                ? { background: 'rgba(16,185,129,0.25)', border: '1px solid rgba(16,185,129,0.6)', color: '#6ee7b7', boxShadow: '0 0 20px rgba(16,185,129,0.3)' }
-                : doorState === 'error'
-                ? { background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)', color: '#fca5a5' }
-                : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.75)' }
-            }
-          >
-            <span>
-              {doorState === 'idle' && '🔓'}
-              {doorState === 'confirm' && '⚠️'}
-              {doorState === 'opening' && '⏳'}
-              {doorState === 'done' && '✓'}
-              {doorState === 'error' && '✗'}
-            </span>
-            <span>
-              {doorState === 'idle' && 'Open Door'}
-              {doorState === 'confirm' && 'Tap again to confirm'}
-              {doorState === 'opening' && 'Opening…'}
-              {doorState === 'done' && 'Door opened'}
-              {doorState === 'error' && 'Failed — retry'}
-            </span>
-          </button>
-
-          {/* Status */}
           {connError ? (
             <div className="flex items-center gap-1.5 text-[11px] text-red-400/80">
               <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
