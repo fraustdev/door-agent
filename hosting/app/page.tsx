@@ -142,8 +142,9 @@ export default function Dashboard() {
         `,
       }}
     >
-      {/* Header */}
-      <div className="px-8 py-4 flex items-center justify-between border-b border-white/[0.06]">
+      {/* Header — full width border, constrained content */}
+      <div className="border-b border-white/[0.06]">
+        <div className="max-w-[1440px] mx-auto px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* 2389 logo mark */}
           <div
@@ -200,9 +201,10 @@ export default function Dashboard() {
             <span className="text-[11px] text-white/25">Connecting…</span>
           )}
         </div>
+        </div>
       </div>
 
-      <div className="px-8 py-6 space-y-5">
+      <div className="max-w-[1440px] mx-auto px-8 py-6 space-y-5">
         {/* Stat cards */}
         <div className="grid grid-cols-4 gap-3">
           {[
