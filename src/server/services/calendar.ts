@@ -26,9 +26,43 @@ export function getAllVisitors(): VisitorWindow[] {
   return cachedVisitors;
 }
 
-function extractFirstName(displayName: string, email: string): string {
-  const name = displayName?.trim() || email.split("@")[0];
-  return name.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "");
+// Words that appear in meeting titles but are never person names
+const TITLE_STOP = new Set([
+  "meeting", "call", "interview", "sync", "chat", "discussion", "review",
+  "session", "catchup", "catch", "standup", "stand", "wrap", "check",
+  "follow", "kickoff", "intro", "introduction", "presentation", "demo",
+  "debrief", "planning", "retro", "retrospective", "briefing", "brainstorm",
+  "workshop", "training", "onboarding", "orientation", "offboarding",
+  "lunch", "coffee", "dinner", "breakfast", "happy", "hour",
+  "with", "and", "the", "a", "an", "for", "to", "of", "in", "on", "at",
+  "by", "from", "between", "about", "re", "vs", "regarding",
+  "team", "group", "all", "hands", "company", "department", "office",
+  "project", "quick", "brief", "weekly", "daily", "monthly", "bi",
+  "one", "two", "three", "four", "five", "six", "seven", "eight",
+]);
+
+function extractNamesFromTitle(title: string): string[] {
+  if (!title?.trim()) return [];
+  const names: string[] = [];
+
+  // Priority pattern: "with [Name]" — most explicit signal
+  const withPattern = /\bwith\s+([A-Z][a-z]{1,})/g;
+  let m: RegExpExecArray | null;
+  while ((m = withPattern.exec(title)) !== null) {
+    names.push(m[1].toLowerCase());
+  }
+
+  // Fallback: any capitalised word not in the stop list
+  for (const word of title.split(/[\s\-|\/&,()[\]]+/)) {
+    const clean = word.replace(/[^a-zA-Z]/g, "");
+    const lower = clean.toLowerCase();
+    if (clean.length < 2 || TITLE_STOP.has(lower)) continue;
+    if (/^[A-Z][a-z]{1,}$/.test(clean) && !names.includes(lower)) {
+      names.push(lower);
+    }
+  }
+
+  return [...new Set(names)];
 }
 
 async function refreshToken(refreshTokenValue: string): Promise<{ accessToken: string; expiry: Date } | null> {
@@ -70,25 +104,29 @@ async function fetchVisitorWindows(accessToken: string, ownerEmail: string): Pro
   const windows: VisitorWindow[] = [];
 
   for (const event of data.items ?? []) {
-    const attendees: { email: string; displayName?: string; self?: boolean }[] = event.attendees ?? [];
-    if (attendees.length <= 1) continue;
+    // Skip cancelled events
+    if (event.status === "cancelled") continue;
 
-    const meetingStart = new Date(event.start?.dateTime ?? event.start?.date);
-    const meetingEnd   = new Date(event.end?.dateTime   ?? event.end?.date);
+    // Skip Google Meet / video calls — those are remote, not in-person visits
+    if (event.conferenceData?.conferenceSolution?.key?.type === "hangoutsMeet") continue;
+
+    // Skip all-day events (no specific time means no door window to calculate)
+    if (!event.start?.dateTime) continue;
+
+    const names = extractNamesFromTitle(event.summary ?? "");
+    if (names.length === 0) continue;
+
+    const meetingStart = new Date(event.start.dateTime);
+    const meetingEnd   = new Date(event.end?.dateTime ?? event.start.dateTime);
     const windowStart  = new Date(meetingStart.getTime() - WINDOW_BEFORE_MS);
     const windowEnd    = new Date(meetingEnd.getTime()   + WINDOW_AFTER_MS);
 
-    for (const attendee of attendees) {
-      if (attendee.email?.toLowerCase() === ownerEmail.toLowerCase()) continue;
-      if (attendee.self) continue;
-
-      const firstName = extractFirstName(attendee.displayName ?? "", attendee.email ?? "");
-      if (!firstName || firstName.length < 2) continue;
-
+    for (const firstName of names) {
+      const display = firstName.charAt(0).toUpperCase() + firstName.slice(1);
       windows.push({
         firstName,
-        displayName: attendee.displayName ?? attendee.email ?? "Unknown",
-        email: attendee.email ?? "",
+        displayName: display,
+        email: "",
         meetingTitle: event.summary ?? "Meeting",
         meetingStart,
         meetingEnd,
@@ -145,9 +183,9 @@ export async function refreshCalendarData(): Promise<void> {
   // Deduplicate by firstName + windowStart to avoid duplicates across calendars
   const seen = new Set<string>();
   cachedVisitors = allWindows.filter(v => {
-    const key = `${v.firstName}|${v.windowStart.toISOString()}|${v.email}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    const k = `${v.firstName}|${v.windowStart.toISOString()}|${v.meetingTitle}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
     return true;
   });
 
