@@ -102,6 +102,20 @@
     box-shadow: 0 0 14px rgba(252,236,82,0.25), inset 0 0 8px rgba(252,236,82,0.06);
     text-shadow: 0 0 10px rgba(252,236,82,0.6);
   }
+  .badge-visitor {
+    background: rgba(59,112,128,0.2);
+    border: 1px solid rgba(59,112,128,0.55);
+    color: #a8cfd8;
+    box-shadow: 0 0 14px rgba(59,112,128,0.25), inset 0 0 8px rgba(59,112,128,0.06);
+    text-shadow: 0 0 10px rgba(59,112,128,0.6);
+  }
+  .badge-injection {
+    background: rgba(249,115,22,0.18);
+    border: 1px solid rgba(249,115,22,0.55);
+    color: #fdba74;
+    box-shadow: 0 0 14px rgba(249,115,22,0.3), inset 0 0 8px rgba(249,115,22,0.06);
+    text-shadow: 0 0 10px rgba(249,115,22,0.6);
+  }
 
   /* Divider */
   .divider {

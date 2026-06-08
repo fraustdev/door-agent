@@ -1,6 +1,21 @@
 import { getTodaysWord } from "./sheets.js";
 import { getActiveVisitors } from "./calendar.js";
 
+const INJECTION_PATTERNS = [
+  /access\s*(granted|approved|denied|allowed|authorized)/i,
+  /door\s*(open|unlock|unlocked)/i,
+  /\b(granted|approved|authorized|unlocked|allowed)\b/i,
+  /you\s*(may|can)\s*(enter|come\s*in|pass)/i,
+  /let\s*(me|you|them)\s*(in|enter|pass)/i,
+  /\b(override|bypass|admin)\b/i,
+  /ignore\s*(previous|prior|above|instructions)/i,
+  /system\s*(command|override|prompt)/i,
+];
+
+export function isInjectionAttempt(input: string): boolean {
+  return INJECTION_PATTERNS.some(p => p.test(input));
+}
+
 export interface AuthResult {
   outcome: "granted" | "denied";
   wordExpected: string | null;

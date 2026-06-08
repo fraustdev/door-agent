@@ -7,6 +7,8 @@ export interface AccessLogRow {
   match_distance: number | null
   granted: boolean
   locked_out: boolean
+  granted_by: string | null
+  is_injection: boolean
 }
 
 export interface LockoutInfo {

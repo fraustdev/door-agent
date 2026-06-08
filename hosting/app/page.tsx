@@ -580,14 +580,18 @@ export default function Dashboard() {
                     {/* Badge */}
                     <span
                       className={`text-[9px] font-bold px-2.5 py-1 rounded-full shrink-0 tracking-[0.1em] uppercase ${
-                        row.locked_out
-                          ? 'badge-locked'
-                          : row.granted
-                          ? 'badge-granted'
-                          : 'badge-denied'
+                        row.locked_out ? 'badge-locked'
+                        : row.is_injection ? 'badge-injection'
+                        : row.granted && row.granted_by === 'visitor' ? 'badge-visitor'
+                        : row.granted ? 'badge-granted'
+                        : 'badge-denied'
                       }`}
                     >
-                      {row.locked_out ? 'Locked' : row.granted ? 'Granted' : 'Denied'}
+                      {row.locked_out ? 'Locked'
+                        : row.is_injection ? 'Injection'
+                        : row.granted && row.granted_by === 'visitor' ? 'Visitor'
+                        : row.granted ? 'Granted'
+                        : 'Denied'}
                     </span>
 
                     {/* Caller */}

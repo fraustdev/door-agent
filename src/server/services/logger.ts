@@ -7,6 +7,8 @@ export interface AccessLogEntry {
   match_distance: number | null;
   granted: boolean;
   locked_out: boolean;
+  granted_by?: string | null;
+  is_injection?: boolean;
 }
 
 let client: SupabaseClient | null = null;
