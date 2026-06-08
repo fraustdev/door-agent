@@ -42,3 +42,19 @@ export function checkRateLimit(callerNumber: string): RateLimitResult {
   current.count++;
   return { allowed: true };
 }
+
+export interface LockoutInfo {
+  callerId: string;
+  msRemaining: number;
+}
+
+export function getActiveLockouts(): LockoutInfo[] {
+  const now = Date.now();
+  const result: LockoutInfo[] = [];
+  for (const [callerId, record] of attempts.entries()) {
+    if (record.lockedUntil && record.lockedUntil > now) {
+      result.push({ callerId, msRemaining: record.lockedUntil - now });
+    }
+  }
+  return result;
+}
