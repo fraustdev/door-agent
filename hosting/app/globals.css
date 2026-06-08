@@ -48,18 +48,18 @@
 
   /* Stat card accent variants */
   .stat-total {
-    background: linear-gradient(150deg, rgba(139,92,246,0.18) 0%, rgba(139,92,246,0.05) 100%);
-    border: 1px solid rgba(139,92,246,0.28);
-    border-top-color: rgba(139,92,246,0.5);
-    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(139,92,246,0.1);
+    background: linear-gradient(150deg, rgba(59,112,128,0.2) 0%, rgba(59,112,128,0.06) 100%);
+    border: 1px solid rgba(59,112,128,0.32);
+    border-top-color: rgba(59,112,128,0.55);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(59,112,128,0.12);
     backdrop-filter: blur(32px) saturate(180%);
     -webkit-backdrop-filter: blur(32px) saturate(180%);
   }
   .stat-granted {
-    background: linear-gradient(150deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.05) 100%);
-    border: 1px solid rgba(16,185,129,0.28);
-    border-top-color: rgba(16,185,129,0.5);
-    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(16,185,129,0.1);
+    background: linear-gradient(150deg, rgba(173,226,93,0.18) 0%, rgba(173,226,93,0.05) 100%);
+    border: 1px solid rgba(173,226,93,0.3);
+    border-top-color: rgba(173,226,93,0.55);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(173,226,93,0.1);
     backdrop-filter: blur(32px) saturate(180%);
     -webkit-backdrop-filter: blur(32px) saturate(180%);
   }
@@ -72,21 +72,21 @@
     -webkit-backdrop-filter: blur(32px) saturate(180%);
   }
   .stat-locked {
-    background: linear-gradient(150deg, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0.05) 100%);
-    border: 1px solid rgba(245,158,11,0.28);
-    border-top-color: rgba(245,158,11,0.5);
-    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(245,158,11,0.1);
+    background: linear-gradient(150deg, rgba(252,236,82,0.16) 0%, rgba(252,236,82,0.04) 100%);
+    border: 1px solid rgba(252,236,82,0.3);
+    border-top-color: rgba(252,236,82,0.55);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(252,236,82,0.1);
     backdrop-filter: blur(32px) saturate(180%);
     -webkit-backdrop-filter: blur(32px) saturate(180%);
   }
 
   /* Status badges */
   .badge-granted {
-    background: rgba(16,185,129,0.18);
-    border: 1px solid rgba(16,185,129,0.5);
-    color: #6ee7b7;
-    box-shadow: 0 0 14px rgba(16,185,129,0.3), inset 0 0 8px rgba(16,185,129,0.08);
-    text-shadow: 0 0 10px rgba(16,185,129,0.7);
+    background: rgba(173,226,93,0.15);
+    border: 1px solid rgba(173,226,93,0.5);
+    color: #cfffb3;
+    box-shadow: 0 0 14px rgba(173,226,93,0.25), inset 0 0 8px rgba(173,226,93,0.06);
+    text-shadow: 0 0 10px rgba(173,226,93,0.6);
   }
   .badge-denied {
     background: rgba(239,68,68,0.18);
@@ -96,11 +96,11 @@
     text-shadow: 0 0 10px rgba(239,68,68,0.7);
   }
   .badge-locked {
-    background: rgba(245,158,11,0.18);
-    border: 1px solid rgba(245,158,11,0.5);
-    color: #fcd34d;
-    box-shadow: 0 0 14px rgba(245,158,11,0.3), inset 0 0 8px rgba(245,158,11,0.08);
-    text-shadow: 0 0 10px rgba(245,158,11,0.7);
+    background: rgba(252,236,82,0.15);
+    border: 1px solid rgba(252,236,82,0.5);
+    color: #fcec52;
+    box-shadow: 0 0 14px rgba(252,236,82,0.25), inset 0 0 8px rgba(252,236,82,0.06);
+    text-shadow: 0 0 10px rgba(252,236,82,0.6);
   }
 
   /* Divider */

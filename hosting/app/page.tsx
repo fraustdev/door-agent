@@ -25,9 +25,9 @@ function GlassTooltip({ active, payload, label }: {
       minWidth: '120px',
     }}>
       <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
-      {granted > 0 && <p style={{ color: '#6ee7b7', fontSize: '13px', marginBottom: '2px' }}>✓ {granted} granted</p>}
+      {granted > 0 && <p style={{ color: '#cfffb3', fontSize: '13px', marginBottom: '2px' }}>✓ {granted} granted</p>}
       {denied  > 0 && <p style={{ color: '#fca5a5', fontSize: '13px', marginBottom: '2px' }}>✗ {denied} denied</p>}
-      {locked  > 0 && <p style={{ color: '#fcd34d', fontSize: '13px' }}>⊘ {locked} locked</p>}
+      {locked  > 0 && <p style={{ color: '#fcec52', fontSize: '13px' }}>⊘ {locked} locked</p>}
       {granted + denied + locked === 0 && <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px' }}>No activity</p>}
     </div>
   )
@@ -144,9 +144,9 @@ export default function Dashboard() {
       className="min-h-screen"
       style={{
         background: `
-          radial-gradient(ellipse at 12% 48%, rgba(139,92,246,0.32) 0%, transparent 48%),
-          radial-gradient(ellipse at 88% 16%, rgba(59,130,246,0.26) 0%, transparent 46%),
-          radial-gradient(ellipse at 52% 90%, rgba(20,184,166,0.2) 0%, transparent 46%),
+          radial-gradient(ellipse at 12% 48%, rgba(59,112,128,0.32) 0%, transparent 48%),
+          radial-gradient(ellipse at 88% 16%, rgba(173,226,93,0.18) 0%, transparent 46%),
+          radial-gradient(ellipse at 52% 90%, rgba(252,236,82,0.14) 0%, transparent 46%),
           #080810
         `,
       }}
@@ -220,35 +220,35 @@ export default function Dashboard() {
               value: today.total,
               sub: 'total attempts',
               cls: 'stat-total',
-              valueColor: 'text-violet-200',
+              valueColor: '#a8cfd8',
             },
             {
               label: 'Granted',
               value: today.granted,
               sub: 'doors opened',
               cls: 'stat-granted',
-              valueColor: 'text-emerald-200',
+              valueColor: '#cfffb3',
             },
             {
               label: 'Denied',
               value: today.denied,
               sub: 'failed attempts',
               cls: 'stat-denied',
-              valueColor: 'text-red-200',
+              valueColor: '#fca5a5',
             },
             {
               label: 'Locked Out',
               value: status?.lockouts.length ?? 0,
               sub: 'active lockouts',
               cls: 'stat-locked',
-              valueColor: 'text-amber-200',
+              valueColor: '#fcec52',
             },
           ].map(({ label, value, sub, cls, valueColor }) => (
             <div key={label} className={`rounded-2xl px-5 py-5 ${cls}`}>
               <p className="text-[10px] font-semibold text-white/50 uppercase tracking-[0.12em] mb-3">
                 {label}
               </p>
-              <p className={`text-[52px] font-[200] leading-none ${valueColor}`}>{value}</p>
+              <p className="text-[52px] font-[200] leading-none" style={{ color: valueColor }}>{value}</p>
               <p className="text-[11px] text-white/30 mt-2.5">{sub}</p>
             </div>
           ))}
@@ -262,16 +262,16 @@ export default function Dashboard() {
             </p>
             <div className="flex items-center gap-4 text-[10px] text-white/30">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(16,185,129,0.8)' }} />
+                <span className="w-2 h-2 rounded-sm" style={{ background: '#ADE25D' }} />
                 Granted
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(239,68,68,0.75)' }} />
+                <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(239,68,68,0.85)' }} />
                 Denied
               </span>
               {stats.some(d => d.locked > 0) && (
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(245,158,11,0.75)' }} />
+                  <span className="w-2 h-2 rounded-sm" style={{ background: '#FCEC52' }} />
                   Locked
                 </span>
               )}
@@ -290,33 +290,27 @@ export default function Dashboard() {
                 content={<GlassTooltip />}
                 cursor={{ fill: 'rgba(255,255,255,0.04)', radius: 6 }}
               />
-              <Bar dataKey="granted" stackId="a" fill="rgba(16,185,129,0.75)" radius={[0, 0, 4, 4]}>
+              <Bar dataKey="granted" stackId="a" fill="#ADE25D" radius={[0, 0, 4, 4]}>
                 {stats.map((entry) => (
                   <Cell
                     key={entry.date}
-                    fill={entry.date === new Date().toISOString().slice(0, 10)
-                      ? 'rgba(16,185,129,0.95)'
-                      : 'rgba(16,185,129,0.65)'}
+                    fill={entry.date === new Date().toISOString().slice(0, 10) ? '#ADE25D' : 'rgba(173,226,93,0.55)'}
                   />
                 ))}
               </Bar>
-              <Bar dataKey="denied" stackId="a" fill="rgba(239,68,68,0.7)" radius={[0, 0, 0, 0]}>
+              <Bar dataKey="denied" stackId="a" fill="rgba(239,68,68,0.75)" radius={[0, 0, 0, 0]}>
                 {stats.map((entry) => (
                   <Cell
                     key={entry.date}
-                    fill={entry.date === new Date().toISOString().slice(0, 10)
-                      ? 'rgba(239,68,68,0.9)'
-                      : 'rgba(239,68,68,0.6)'}
+                    fill={entry.date === new Date().toISOString().slice(0, 10) ? 'rgba(239,68,68,0.95)' : 'rgba(239,68,68,0.6)'}
                   />
                 ))}
               </Bar>
-              <Bar dataKey="locked" stackId="a" fill="rgba(245,158,11,0.7)" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="locked" stackId="a" fill="#FCEC52" radius={[4, 4, 0, 0]}>
                 {stats.map((entry) => (
                   <Cell
                     key={entry.date}
-                    fill={entry.date === new Date().toISOString().slice(0, 10)
-                      ? 'rgba(245,158,11,0.9)'
-                      : 'rgba(245,158,11,0.6)'}
+                    fill={entry.date === new Date().toISOString().slice(0, 10) ? '#FCEC52' : 'rgba(252,236,82,0.55)'}
                   />
                 ))}
               </Bar>
@@ -385,7 +379,7 @@ export default function Dashboard() {
                     <>
                       <p
                         className="text-[38px] font-[300] leading-none capitalize text-white/95"
-                        style={{ textShadow: '0 0 40px rgba(139,92,246,0.5)' }}
+                        style={{ textShadow: '0 0 40px rgba(59,112,128,0.6)' }}
                       >
                         {status.currentWord}
                       </p>
