@@ -54,6 +54,20 @@ export default function Dashboard() {
   const [wordFeedback, setWordFeedback] = useState<'saved' | 'error' | null>(null)
   const wordInputRef = useRef<HTMLInputElement>(null)
 
+  // Word background image
+  const [wordImageUrl, setWordImageUrl] = useState<string | null>(null)
+  const [wordImageLoaded, setWordImageLoaded] = useState(false)
+  const prevWord = useRef<string | null>(null)
+
+  useEffect(() => {
+    const word = status?.currentWord
+    if (word && word !== prevWord.current) {
+      prevWord.current = word
+      setWordImageLoaded(false)
+      setWordImageUrl(`https://source.unsplash.com/featured/800x600/?${encodeURIComponent(word)}`)
+    }
+  }, [status?.currentWord])
+
   const refresh = useCallback(async () => {
     try {
       const [lr, sr, str] = await Promise.all([
@@ -258,75 +272,105 @@ export default function Dashboard() {
           {/* Left panel */}
           <div className="space-y-4">
             {/* Word of the day */}
-            <div className="rounded-2xl glass px-6 py-6">
-              <div className="flex items-center justify-between mb-5">
-                <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em]">
-                  Word of the Day
-                </p>
-                {!editingWord && (
-                  <button
-                    onClick={startEditWord}
-                    className="text-[11px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-
-              {editingWord ? (
-                <form onSubmit={saveWord} className="space-y-3">
-                  <input
-                    ref={wordInputRef}
-                    value={wordInput}
-                    onChange={e => setWordInput(e.target.value)}
-                    placeholder="New word…"
-                    maxLength={32}
-                    className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-[20px] font-light text-white/90 placeholder-white/20 outline-none focus:border-violet-400/50 focus:bg-white/8 transition-all capitalize"
+            <div
+              className="rounded-2xl overflow-hidden relative"
+              style={{
+                minHeight: '190px',
+                border: '1px solid rgba(255,255,255,0.13)',
+                borderTopColor: 'rgba(255,255,255,0.26)',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12)',
+              }}
+            >
+              {/* Background: photo or glass */}
+              {wordImageUrl ? (
+                <>
+                  <img
+                    src={wordImageUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ opacity: wordImageLoaded ? 1 : 0, transition: 'opacity 0.6s ease' }}
+                    onLoad={() => setWordImageLoaded(true)}
                   />
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={wordSaving || !wordInput.trim()}
-                      className="flex-1 py-2 rounded-xl text-[12px] font-medium transition-all disabled:opacity-40"
-                      style={{ background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)', color: '#c4b5fd' }}
-                    >
-                      {wordSaving ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setEditingWord(false); setWordFeedback(null) }}
-                      className="px-4 py-2 rounded-xl text-[12px] text-white/40 hover:text-white/60 transition-colors"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  {wordFeedback === 'error' && (
-                    <p className="text-[11px] text-red-400/80">Failed to save — check server logs</p>
-                  )}
-                </form>
+                  <div
+                    className="absolute inset-0"
+                    style={{ background: 'linear-gradient(160deg, rgba(8,8,16,0.1) 0%, rgba(8,8,16,0.88) 62%)' }}
+                  />
+                </>
               ) : (
-                <div>
-                  {wordFeedback === 'saved' && (
-                    <p className="text-[11px] text-emerald-400/80 mb-2">✓ Word updated</p>
-                  )}
-                  {status?.currentWord ? (
-                    <>
-                      <p
-                        className="text-[38px] font-[300] leading-none capitalize text-white/95"
-                        style={{ textShadow: '0 0 40px rgba(59,112,128,0.6)' }}
-                      >
-                        {status.currentWord}
-                      </p>
-                      <p className="text-[11px] text-white/30 mt-4">
-                        Callers must speak this word to enter
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-[13px] text-white/25 italic">Not available</p>
+                <div className="absolute inset-0 glass" style={{ borderRadius: 0 }} />
+              )}
+
+              {/* Content */}
+              <div className="relative z-10 px-6 py-6">
+                <div className="flex items-center justify-between mb-5">
+                  <p className="text-[10px] font-semibold text-white/50 uppercase tracking-[0.12em]">
+                    Word of the Day
+                  </p>
+                  {!editingWord && (
+                    <button
+                      onClick={startEditWord}
+                      className="text-[11px] text-white/40 hover:text-white/70 transition-colors px-2 py-1 rounded-lg hover:bg-white/10"
+                    >
+                      Edit
+                    </button>
                   )}
                 </div>
-              )}
+
+                {editingWord ? (
+                  <form onSubmit={saveWord} className="space-y-3">
+                    <input
+                      ref={wordInputRef}
+                      value={wordInput}
+                      onChange={e => setWordInput(e.target.value)}
+                      placeholder="New word…"
+                      maxLength={32}
+                      className="w-full bg-black/30 border border-white/20 rounded-xl px-4 py-3 text-[20px] font-light text-white/90 placeholder-white/25 outline-none focus:border-white/40 transition-all capitalize"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={wordSaving || !wordInput.trim()}
+                        className="flex-1 py-2 rounded-xl text-[12px] font-medium transition-all disabled:opacity-40"
+                        style={{ background: 'rgba(59,112,128,0.5)', border: '1px solid rgba(59,112,128,0.7)', color: '#a8cfd8' }}
+                      >
+                        {wordSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingWord(false); setWordFeedback(null) }}
+                        className="px-4 py-2 rounded-xl text-[12px] text-white/40 hover:text-white/60 transition-colors"
+                        style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {wordFeedback === 'error' && (
+                      <p className="text-[11px] text-red-400/80">Failed to save — check server logs</p>
+                    )}
+                  </form>
+                ) : (
+                  <div>
+                    {wordFeedback === 'saved' && (
+                      <p className="text-[11px] mb-2" style={{ color: '#cfffb3' }}>✓ Word updated</p>
+                    )}
+                    {status?.currentWord ? (
+                      <>
+                        <p
+                          className="text-[38px] font-[300] leading-none capitalize text-white"
+                          style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
+                        >
+                          {status.currentWord}
+                        </p>
+                        <p className="text-[11px] text-white/40 mt-4">
+                          Callers must speak this word to enter
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[13px] text-white/25 italic">Not available</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Active lockouts */}
