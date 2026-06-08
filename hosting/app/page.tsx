@@ -1,7 +1,37 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { AccessLogRow, StatusData } from '../lib/types'
+import {
+  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts'
+import type { AccessLogRow, StatusData, DayStat } from '../lib/types'
+
+function GlassTooltip({ active, payload, label }: {
+  active?: boolean
+  payload?: { value: number; name: string; fill: string }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  const granted = payload.find(p => p.name === 'granted')?.value ?? 0
+  const denied  = payload.find(p => p.name === 'denied')?.value ?? 0
+  const locked  = payload.find(p => p.name === 'locked')?.value ?? 0
+  return (
+    <div style={{
+      background: 'rgba(10,10,20,0.95)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: '10px',
+      padding: '10px 14px',
+      backdropFilter: 'blur(24px)',
+      minWidth: '120px',
+    }}>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
+      {granted > 0 && <p style={{ color: '#6ee7b7', fontSize: '13px', marginBottom: '2px' }}>✓ {granted} granted</p>}
+      {denied  > 0 && <p style={{ color: '#fca5a5', fontSize: '13px', marginBottom: '2px' }}>✗ {denied} denied</p>}
+      {locked  > 0 && <p style={{ color: '#fcd34d', fontSize: '13px' }}>⊘ {locked} locked</p>}
+      {granted + denied + locked === 0 && <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px' }}>No activity</p>}
+    </div>
+  )
+}
 
 function timeAgo(iso: string): string {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -40,6 +70,7 @@ function todayStats(logs: AccessLogRow[]) {
 export default function Dashboard() {
   const [logs, setLogs] = useState<AccessLogRow[]>([])
   const [status, setStatus] = useState<StatusData | null>(null)
+  const [stats, setStats] = useState<DayStat[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [connError, setConnError] = useState(false)
 
@@ -52,9 +83,14 @@ export default function Dashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const [lr, sr] = await Promise.all([fetch('/api/logs'), fetch('/api/status')])
-      if (lr.ok) setLogs(await lr.json())
-      if (sr.ok) setStatus(await sr.json())
+      const [lr, sr, str] = await Promise.all([
+        fetch('/api/logs'),
+        fetch('/api/status'),
+        fetch('/api/stats'),
+      ])
+      if (lr.ok)  setLogs(await lr.json())
+      if (sr.ok)  setStatus(await sr.json())
+      if (str.ok) setStats(await str.json())
       setLastUpdated(new Date())
       setConnError(false)
     } catch {
@@ -101,7 +137,7 @@ export default function Dashboard() {
     }
   }
 
-  const stats = todayStats(logs)
+  const today = todayStats(logs)
 
   return (
     <div
@@ -116,23 +152,45 @@ export default function Dashboard() {
       }}
     >
       {/* Header */}
-      <div className="px-8 py-5 flex items-center justify-between border-b border-white/[0.06]">
-        <div className="flex items-center gap-3.5">
+      <div className="px-8 py-4 flex items-center justify-between border-b border-white/[0.06]">
+        <div className="flex items-center gap-3">
+          {/* 2389 logo mark */}
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-lg select-none"
+            className="select-none flex items-center justify-center px-2.5 py-1.5 rounded-lg"
             style={{
-              background: 'linear-gradient(135deg, rgba(139,92,246,0.4) 0%, rgba(59,130,246,0.3) 100%)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              boxShadow: '0 4px 16px rgba(139,92,246,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+              background: '#0c0c0c',
+              border: '1px solid rgba(255,255,255,0.13)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)',
             }}
           >
-            🚪
+            <span
+              style={{
+                fontWeight: 900,
+                fontSize: '17px',
+                color: '#ffffff',
+                letterSpacing: '-0.04em',
+                lineHeight: 1,
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+              }}
+            >
+              2389
+            </span>
           </div>
+
+          {/* Divider */}
+          <div className="w-px h-5 bg-white/10" />
+
+          {/* Product name */}
           <div>
-            <h1 className="text-[15px] font-semibold text-white/95 tracking-tight leading-none">
-              Door Agent
+            <h1
+              className="text-[18px] leading-none text-white/95"
+              style={{ fontWeight: 700, letterSpacing: '-0.03em' }}
+            >
+              Door
             </h1>
-            <p className="text-[11px] text-white/35 mt-0.5 tracking-wide">2389.ai · Office access control</p>
+            <p className="text-[10px] text-white/30 mt-0.5 tracking-widest uppercase">
+              Access Control
+            </p>
           </div>
         </div>
 
@@ -159,21 +217,21 @@ export default function Dashboard() {
           {[
             {
               label: 'Today',
-              value: stats.total,
+              value: today.total,
               sub: 'total attempts',
               cls: 'stat-total',
               valueColor: 'text-violet-200',
             },
             {
               label: 'Granted',
-              value: stats.granted,
+              value: today.granted,
               sub: 'doors opened',
               cls: 'stat-granted',
               valueColor: 'text-emerald-200',
             },
             {
               label: 'Denied',
-              value: stats.denied,
+              value: today.denied,
               sub: 'failed attempts',
               cls: 'stat-denied',
               valueColor: 'text-red-200',
@@ -194,6 +252,76 @@ export default function Dashboard() {
               <p className="text-[11px] text-white/30 mt-2.5">{sub}</p>
             </div>
           ))}
+        </div>
+
+        {/* 7-day chart */}
+        <div className="rounded-2xl glass px-6 pt-5 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em]">
+              7-Day Activity
+            </p>
+            <div className="flex items-center gap-4 text-[10px] text-white/30">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(16,185,129,0.8)' }} />
+                Granted
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(239,68,68,0.75)' }} />
+                Denied
+              </span>
+              {stats.some(d => d.locked > 0) && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(245,158,11,0.75)' }} />
+                  Locked
+                </span>
+              )}
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={120}>
+            <BarChart data={stats} barSize={28} barGap={4} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+                dy={6}
+              />
+              <Tooltip
+                content={<GlassTooltip />}
+                cursor={{ fill: 'rgba(255,255,255,0.04)', radius: 6 }}
+              />
+              <Bar dataKey="granted" stackId="a" fill="rgba(16,185,129,0.75)" radius={[0, 0, 4, 4]}>
+                {stats.map((entry) => (
+                  <Cell
+                    key={entry.date}
+                    fill={entry.date === new Date().toISOString().slice(0, 10)
+                      ? 'rgba(16,185,129,0.95)'
+                      : 'rgba(16,185,129,0.65)'}
+                  />
+                ))}
+              </Bar>
+              <Bar dataKey="denied" stackId="a" fill="rgba(239,68,68,0.7)" radius={[0, 0, 0, 0]}>
+                {stats.map((entry) => (
+                  <Cell
+                    key={entry.date}
+                    fill={entry.date === new Date().toISOString().slice(0, 10)
+                      ? 'rgba(239,68,68,0.9)'
+                      : 'rgba(239,68,68,0.6)'}
+                  />
+                ))}
+              </Bar>
+              <Bar dataKey="locked" stackId="a" fill="rgba(245,158,11,0.7)" radius={[4, 4, 0, 0]}>
+                {stats.map((entry) => (
+                  <Cell
+                    key={entry.date}
+                    fill={entry.date === new Date().toISOString().slice(0, 10)
+                      ? 'rgba(245,158,11,0.9)'
+                      : 'rgba(245,158,11,0.6)'}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
         {/* Main content */}

@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    background-color: #080810;
+    color: #f0f2ff;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 99px; }
+}
+
+@layer components {
+  /* Primary glass — cards and panels */
+  .glass {
+    background: linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%);
+    backdrop-filter: blur(40px) saturate(200%) brightness(1.08);
+    -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.08);
+    border: 1px solid rgba(255,255,255,0.13);
+    border-top-color: rgba(255,255,255,0.28);
+    border-left-color: rgba(255,255,255,0.17);
+    box-shadow:
+      0 24px 64px rgba(0,0,0,0.55),
+      0 4px 16px rgba(0,0,0,0.3),
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      inset 0 -1px 0 rgba(0,0,0,0.2);
+  }
+
+  /* Lighter glass — log rows */
+  .glass-row {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .glass-row:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.13);
+  }
+
+  /* Stat card accent variants */
+  .stat-total {
+    background: linear-gradient(150deg, rgba(139,92,246,0.18) 0%, rgba(139,92,246,0.05) 100%);
+    border: 1px solid rgba(139,92,246,0.28);
+    border-top-color: rgba(139,92,246,0.5);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(139,92,246,0.1);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+  }
+  .stat-granted {
+    background: linear-gradient(150deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.05) 100%);
+    border: 1px solid rgba(16,185,129,0.28);
+    border-top-color: rgba(16,185,129,0.5);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(16,185,129,0.1);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+  }
+  .stat-denied {
+    background: linear-gradient(150deg, rgba(239,68,68,0.18) 0%, rgba(239,68,68,0.05) 100%);
+    border: 1px solid rgba(239,68,68,0.28);
+    border-top-color: rgba(239,68,68,0.5);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(239,68,68,0.1);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+  }
+  .stat-locked {
+    background: linear-gradient(150deg, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0.05) 100%);
+    border: 1px solid rgba(245,158,11,0.28);
+    border-top-color: rgba(245,158,11,0.5);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 60px rgba(245,158,11,0.1);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+  }
+
+  /* Status badges */
+  .badge-granted {
+    background: rgba(16,185,129,0.18);
+    border: 1px solid rgba(16,185,129,0.5);
+    color: #6ee7b7;
+    box-shadow: 0 0 14px rgba(16,185,129,0.3), inset 0 0 8px rgba(16,185,129,0.08);
+    text-shadow: 0 0 10px rgba(16,185,129,0.7);
+  }
+  .badge-denied {
+    background: rgba(239,68,68,0.18);
+    border: 1px solid rgba(239,68,68,0.5);
+    color: #fca5a5;
+    box-shadow: 0 0 14px rgba(239,68,68,0.3), inset 0 0 8px rgba(239,68,68,0.08);
+    text-shadow: 0 0 10px rgba(239,68,68,0.7);
+  }
+  .badge-locked {
+    background: rgba(245,158,11,0.18);
+    border: 1px solid rgba(245,158,11,0.5);
+    color: #fcd34d;
+    box-shadow: 0 0 14px rgba(245,158,11,0.3), inset 0 0 8px rgba(245,158,11,0.08);
+    text-shadow: 0 0 10px rgba(245,158,11,0.7);
+  }
+
+  /* Divider */
+  .divider {
+    border-color: rgba(255,255,255,0.07);
+  }
+}

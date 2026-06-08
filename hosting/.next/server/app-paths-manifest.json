@@ -1,0 +1,8 @@
+{
+  "/api/logs/route": "app/api/logs/route.js",
+  "/api/status/route": "app/api/status/route.js",
+  "/api/stats/route": "app/api/stats/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/word/route": "app/api/word/route.js",
+  "/page": "app/page.js"
+}
