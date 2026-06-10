@@ -1,5 +1,5 @@
 import { getTodaysWord } from "./sheets.js";
-import { getActiveVisitors } from "./calendar.js";
+import { getTodaysVisitors } from "./visitors.js";
 
 const INJECTION_PATTERNS = [
   /access\s*(granted|approved|denied|allowed|authorized)/i,
@@ -55,16 +55,17 @@ export async function verifyIdentity(input: string): Promise<AuthResult> {
     }
   }
 
-  // Check active visitor windows
-  for (const visitor of getActiveVisitors()) {
-    const distance = levenshtein(normalized, visitor.firstName);
-    if (distance <= allowedDistance(visitor.firstName)) {
+  // Check today's Slack visitor list
+  const visitors = await getTodaysVisitors();
+  for (const name of visitors) {
+    const distance = levenshtein(normalized, name);
+    if (distance <= allowedDistance(name)) {
       return {
         outcome: "granted",
-        wordExpected: visitor.firstName,
+        wordExpected: name,
         matchDistance: distance,
         grantedBy: "visitor",
-        visitorName: visitor.displayName,
+        visitorName: name.charAt(0).toUpperCase() + name.slice(1),
       };
     }
   }

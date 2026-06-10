@@ -21,22 +21,12 @@ export interface StatusData {
   lockouts: LockoutInfo[]
 }
 
-export interface VisitorWindow {
-  firstName: string
-  displayName: string
-  meetingTitle: string
-  meetingStart: string
-  meetingEnd: string
-  windowStart: string
-  windowEnd: string
-  calendarOwner: string
-  active: boolean
-}
-
-export interface CalendarConnection {
-  email: string
-  display_name: string | null
+export interface SlackVisitor {
+  id: string
   created_at: string
+  name: string
+  added_by: string | null
+  date: string
 }
 
 export interface DayStat {

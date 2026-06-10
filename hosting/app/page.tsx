@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import type { AccessLogRow, StatusData, DayStat, VisitorWindow, CalendarConnection } from '../lib/types'
+import type { AccessLogRow, StatusData, DayStat, SlackVisitor } from '../lib/types'
 
 const WeeklyChart = dynamic(() => import('./WeeklyChart'), { ssr: false })
 
@@ -29,24 +29,6 @@ function maskCaller(id: string): string {
   return id
 }
 
-function groupVisitorsByDay(visitors: VisitorWindow[]): { label: string; date: string; visitors: VisitorWindow[] }[] {
-  const map = new Map<string, VisitorWindow[]>()
-  for (const v of visitors) {
-    const date = v.meetingStart.slice(0, 10)
-    if (!map.has(date)) map.set(date, [])
-    map.get(date)!.push(v)
-  }
-  const today = new Date().toISOString().slice(0, 10)
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, visitors]) => {
-      const label = date === today ? 'Today'
-        : date === tomorrow ? 'Tomorrow'
-        : new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
-      return { label, date, visitors }
-    })
-}
 
 function todayStats(logs: AccessLogRow[]) {
   const start = new Date()
@@ -63,12 +45,9 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<AccessLogRow[]>([])
   const [status, setStatus] = useState<StatusData | null>(null)
   const [stats, setStats] = useState<DayStat[]>([])
-  const [visitors, setVisitors] = useState<VisitorWindow[]>([])
-  const [calendars, setCalendars] = useState<CalendarConnection[]>([])
+  const [visitors, setVisitors] = useState<SlackVisitor[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [connError, setConnError] = useState(false)
-  const [calendarFeedback, setCalendarFeedback] = useState<string | null>(null)
-  const [calendarRefreshing, setCalendarRefreshing] = useState(false)
 
   // Word editing
   const [editingWord, setEditingWord] = useState(false)
@@ -97,18 +76,16 @@ export default function Dashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const [lr, sr, str, vr, cr] = await Promise.all([
+      const [lr, sr, str, vr] = await Promise.all([
         fetch('/api/logs'),
         fetch('/api/status'),
         fetch('/api/stats'),
         fetch('/api/visitors'),
-        fetch('/api/calendars'),
       ])
       if (lr.ok)  setLogs(await lr.json())
       if (sr.ok)  setStatus(await sr.json())
       if (str.ok) setStats(await str.json())
       if (vr.ok)  setVisitors(await vr.json())
-      if (cr.ok)  setCalendars(await cr.json())
       setLastUpdated(new Date())
       setConnError(false)
     } catch {
@@ -116,37 +93,7 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Handle OAuth callback feedback
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const connected = params.get('calendar_connected')
-    const error = params.get('calendar_error')
-    if (connected) {
-      setCalendarFeedback(`✓ ${decodeURIComponent(connected)} connected`)
-      window.history.replaceState({}, '', '/')
-    } else if (error) {
-      setCalendarFeedback(`Failed to connect: ${error}`)
-      window.history.replaceState({}, '', '/')
-    }
-  }, [])
-
-  const forceCalendarRefresh = async () => {
-    setCalendarRefreshing(true)
-    await fetch('/api/calendar', { method: 'POST' }).catch(() => {})
-    await refresh()
-    setCalendarRefreshing(false)
-  }
-
-  const disconnectCalendar = async (email: string) => {
-    await fetch('/api/calendars', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    })
-    await refresh()
-  }
-
-  useEffect(() => {
+useEffect(() => {
     refresh()
     const id = setInterval(refresh, 5000)
     return () => clearInterval(id)
@@ -463,96 +410,23 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Visitor schedule — week view */}
+            {/* Today's visitors — from Slack */}
             <div className="rounded-2xl glass px-6 py-6">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em]">
-                  Visitor Schedule
-                </p>
-                <button
-                  onClick={forceCalendarRefresh}
-                  disabled={calendarRefreshing}
-                  className="text-[10px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5 disabled:opacity-40"
-                >
-                  {calendarRefreshing ? 'Refreshing…' : '↻ Refresh'}
-                </button>
-              </div>
+              <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em] mb-4">
+                Today&apos;s Visitors
+              </p>
               {visitors.length === 0 ? (
-                <p className="text-[13px] text-white/25 italic">No visitors this week</p>
+                <p className="text-[13px] text-white/25 italic">No visitors added yet today</p>
               ) : (
-                <div className="space-y-4 max-h-[320px] overflow-y-auto pr-0.5">
-                  {groupVisitorsByDay(visitors).map(({ label, date, visitors: dayVisitors }) => (
-                    <div key={date}>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
-                         style={{ color: label === 'Today' ? '#ADE25D' : 'rgba(255,255,255,0.35)' }}>
-                        {label}
-                      </p>
-                      <div className="space-y-1.5">
-                        {dayVisitors.map((v, i) => (
-                          <div key={i} className="glass-row rounded-xl px-4 py-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                {v.active && (
-                                  <span className="w-1.5 h-1.5 rounded-full shrink-0"
-                                        style={{ background: '#ADE25D', boxShadow: '0 0 6px rgba(173,226,93,0.7)' }} />
-                                )}
-                                <p className="text-[13px] text-white/85 font-medium capitalize truncate">{v.firstName}</p>
-                              </div>
-                              <p className="text-[10px] text-white/30 shrink-0 tabular-nums">
-                                {new Date(v.meetingStart).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                                {' – '}
-                                {new Date(v.meetingEnd).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                              </p>
-                            </div>
-                            <p className="text-[10px] text-white/30 mt-1 truncate">{v.meetingTitle}</p>
-                            <p className="text-[9px] text-white/20 mt-0.5">
-                              Door access: {new Date(v.windowStart).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                              {' – '}
-                              {new Date(v.windowEnd).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                <div className="space-y-1.5 max-h-[320px] overflow-y-auto pr-0.5">
+                  {visitors.map(v => (
+                    <div key={v.id} className="glass-row rounded-xl px-4 py-3 flex items-center justify-between gap-2">
+                      <p className="text-[13px] text-white/85 font-medium capitalize">{v.name}</p>
+                      <p className="text-[11px] text-white/25 shrink-0 tabular-nums">{timeAgo(v.created_at)}</p>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Connected calendars */}
-            <div className="rounded-2xl glass px-6 py-6">
-              <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em] mb-4">
-                Calendars
-              </p>
-              {calendarFeedback && (
-                <p className="text-[11px] mb-3" style={{ color: calendarFeedback.startsWith('✓') ? '#cfffb3' : '#fca5a5' }}>
-                  {calendarFeedback}
-                </p>
-              )}
-              <div className="space-y-2 mb-3">
-                {calendars.map(c => (
-                  <div key={c.email} className="glass-row rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[12px] text-white/80 truncate">{c.display_name ?? c.email}</p>
-                      <p className="text-[10px] text-white/30 truncate">{c.email}</p>
-                    </div>
-                    <button
-                      onClick={() => disconnectCalendar(c.email)}
-                      className="text-[10px] text-white/30 hover:text-red-400/70 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-red-400/10"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <a
-                href="/api/auth/google"
-                className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-[12px] font-medium transition-all"
-                style={{ background: 'rgba(59,112,128,0.25)', border: '1px solid rgba(59,112,128,0.45)', color: '#a8cfd8' }}
-              >
-                <span>+</span>
-                <span>Connect a calendar</span>
-              </a>
             </div>
           </div>
 

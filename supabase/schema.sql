@@ -13,12 +13,12 @@ create table access_log (
 create index access_log_created_at_idx on access_log (created_at desc);
 create index access_log_caller_id_idx  on access_log (caller_id);
 
-create table calendar_connections (
-  id            uuid        primary key default gen_random_uuid(),
-  created_at    timestamptz default now(),
-  email         text        not null unique,
-  display_name  text,
-  refresh_token text        not null,
-  access_token  text,
-  token_expiry  timestamptz
+create table visitors (
+  id         uuid        primary key default gen_random_uuid(),
+  created_at timestamptz default now(),
+  name       text        not null,
+  added_by   text,
+  date       date        not null default current_date
 );
+
+create index visitors_date_idx on visitors (date);

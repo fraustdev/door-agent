@@ -1,11 +1,45 @@
 import "dotenv/config";
 import express from "express";
+import cron from "node-cron";
 import webhookRouter from "./routes/webhook.js";
 import { registerWatch, getTodaysWord, setTodaysWord } from "./services/sheets.js";
 import { getActiveLockouts } from "./services/rateLimiter.js";
-import { refreshCalendarData, getAllVisitors } from "./services/calendar.js";
+import { getVisitorRows } from "./services/visitors.js";
+import { postMorningMessage, verifySlackRequest, handleSlackEvent } from "./services/slack.js";
 
 const app = express();
+
+// Must be registered before express.json() to preserve raw body for signature verification
+app.post("/slack/events", express.raw({ type: "application/json" }), async (req, res) => {
+  const rawBody: Buffer = req.body;
+
+  if (!verifySlackRequest(rawBody, req.headers as Record<string, string | string[] | undefined>)) {
+    res.sendStatus(401);
+    return;
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(rawBody.toString());
+  } catch {
+    res.sendStatus(400);
+    return;
+  }
+
+  // Slack URL verification challenge (one-time setup)
+  if (payload.type === "url_verification") {
+    res.json({ challenge: payload.challenge });
+    return;
+  }
+
+  res.sendStatus(200);
+
+  if (payload.type === "event_callback") {
+    const event = payload.event as Record<string, unknown>;
+    handleSlackEvent(event).catch(console.error);
+  }
+});
+
 app.use(express.json({ limit: "1mb" }));
 app.get("/ping", (_req, res) => res.sendStatus(200));
 
@@ -34,27 +68,11 @@ app.put("/word", async (req, res) => {
   }
 });
 
-app.post("/calendar/refresh", async (req, res) => {
+app.get("/visitors", async (req, res) => {
   const key = process.env.DASHBOARD_API_KEY;
   if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
-  await refreshCalendarData().catch((err) => console.error("Manual calendar refresh failed:", err));
-  res.json({ ok: true, visitors: getAllVisitors().length });
-});
-
-app.get("/visitors", (req, res) => {
-  const key = process.env.DASHBOARD_API_KEY;
-  if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
-  res.json(getAllVisitors().map(v => ({
-    firstName: v.firstName,
-    displayName: v.displayName,
-    meetingTitle: v.meetingTitle,
-    meetingStart: v.meetingStart.toISOString(),
-    meetingEnd: v.meetingEnd.toISOString(),
-    windowStart: v.windowStart.toISOString(),
-    windowEnd: v.windowEnd.toISOString(),
-    calendarOwner: v.calendarOwner,
-    active: v.windowStart.getTime() <= Date.now() && v.windowEnd.getTime() >= Date.now(),
-  })));
+  const rows = await getVisitorRows().catch(() => []);
+  res.json(rows);
 });
 
 app.use(webhookRouter);
@@ -63,7 +81,6 @@ const PORT = process.env.PORT ?? 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   registerWatch().catch((err) => console.error("Sheets watch registration failed:", err));
-  refreshCalendarData().catch((err) => console.error("Initial calendar refresh failed:", err));
 });
 
 // Renew 1 day before the 7-day Google expiry
@@ -72,7 +89,7 @@ setInterval(() => {
   registerWatch().catch((err) => console.error("Sheets watch renewal failed:", err));
 }, SIX_DAYS_MS);
 
-// Refresh calendar visitor windows every 5 minutes
-setInterval(() => {
-  refreshCalendarData().catch((err) => console.error("Calendar refresh failed:", err));
-}, 5 * 60 * 1000);
+// Post morning visitor check message at 8am Chicago time
+cron.schedule("0 8 * * *", () => {
+  postMorningMessage().catch(console.error);
+}, { timezone: "America/Chicago" });
