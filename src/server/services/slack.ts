@@ -1,60 +1,39 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { WebClient } from "@slack/web-api";
 import crypto from "crypto";
 import { addVisitor, removeVisitor } from "./visitors.js";
 
-const STOP_WORDS = new Set([
-  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-  "january", "february", "march", "april", "june", "july", "august",
-  "september", "october", "november", "december",
-  "good", "morning", "afternoon", "evening", "night",
-  "hey", "hi", "hello", "yes", "yeah", "nope", "sure", "ok", "okay", "great", "thanks",
-  "everyone", "team", "all", "folks", "guys",
-  "i", "a", "the", "an", "is", "are", "will", "be", "have", "has", "was",
-  "in", "on", "at", "by", "to", "for", "with", "and", "or", "but", "so", "just",
-  "coming", "visiting", "stopping", "dropping", "bringing", "swinging", "meeting",
-  "office", "door", "building", "today", "tomorrow", "later", "soon", "there", "here",
-  "around", "probably", "maybe", "no", "not", "also",
-  "what", "about", "please", "her", "him", "them", "forget", "delete", "remove",
-  "list", "that", "was", "add", "from", "don't", "doesn't", "isn't", "wasn't",
-]);
+interface ParsedMessage {
+  intent: "add" | "remove" | "none";
+  names: string[];
+}
 
-export function extractNames(text: string): string[] {
-  const found = new Set<string>();
-  const tokens = text.trim().split(/\s+/);
+async function parseMessage(text: string): Promise<ParsedMessage> {
+  const client = new Anthropic();
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 256,
+    system:
+      "You parse Slack messages sent in an office door access channel. " +
+      "Determine whether the message intends to ADD visitors to the access list, REMOVE someone from it, or is unrelated. " +
+      "Extract only person names (first name or full name). " +
+      "Return JSON only: {\"intent\": \"add\"|\"remove\"|\"none\", \"names\": [\"name1\"]}. " +
+      "Examples: " +
+      "\"John is stopping by\" → {\"intent\":\"add\",\"names\":[\"john\"]}. " +
+      "\"take Jessica off the list\" → {\"intent\":\"remove\",\"names\":[\"jessica\"]}. " +
+      "\"delete What\" → {\"intent\":\"remove\",\"names\":[\"what\"]}. " +
+      "\"see you guys later\" → {\"intent\":\"none\",\"names\":[]}.",
+    messages: [{ role: "user", content: text }],
+  });
 
-  let i = 0;
-  while (i < tokens.length) {
-    const tok = tokens[i].replace(/[^a-zA-Z'-]/g, "");
-    if (
-      tok.length < 2 ||
-      !/^[A-Z]/.test(tok) ||
-      tok === tok.toUpperCase() ||
-      STOP_WORDS.has(tok.toLowerCase())
-    ) {
-      i++;
-      continue;
-    }
-
-    const firstName = tok.toLowerCase();
-
-    // Check if the next token could be a last name
-    const next = tokens[i + 1]?.replace(/[^a-zA-Z'-]/g, "");
-    if (
-      next &&
-      next.length >= 2 &&
-      /^[A-Z]/.test(next) &&
-      next !== next.toUpperCase() &&
-      !STOP_WORDS.has(next.toLowerCase())
-    ) {
-      found.add(`${firstName} ${next.toLowerCase()}`);
-      i += 2;
-    } else {
-      found.add(firstName);
-      i++;
-    }
+  const content = response.content[0];
+  if (content.type !== "text") return { intent: "none", names: [] };
+  try {
+    const raw = content.text.match(/\{[\s\S]*\}/)?.[0] ?? content.text;
+    return JSON.parse(raw) as ParsedMessage;
+  } catch {
+    return { intent: "none", names: [] };
   }
-
-  return [...found];
 }
 
 export function verifySlackRequest(
@@ -81,7 +60,7 @@ export function verifySlackRequest(
   }
 }
 
-function getClient(): WebClient {
+function getSlackClient(): WebClient {
   return new WebClient(process.env.SLACK_BOT_TOKEN);
 }
 
@@ -94,7 +73,7 @@ export async function postMorningMessage(): Promise<void> {
   }
 
   try {
-    await getClient().chat.postMessage({
+    await getSlackClient().chat.postMessage({
       channel: channelId,
       text: "Any visitors today?",
     });
@@ -115,48 +94,54 @@ export async function handleSlackEvent(event: Record<string, unknown>): Promise<
   const channel = typeof event.channel === "string" ? event.channel : process.env.SLACK_CHANNEL_ID ?? "";
   const threadTs = typeof event.thread_ts === "string" ? event.thread_ts
     : typeof event.ts === "string" ? event.ts : undefined;
-
   const userId = typeof event.user === "string" ? event.user : "unknown";
 
-  // Check for delete/remove intent before trying to add names
-  const deleteMatch = text.match(/(?:delete|remove)\s+([A-Za-z][a-zA-Z'-]*(?:\s+[A-Za-z][a-zA-Z'-]*)?)/i);
-  if (deleteMatch) {
-    const name = deleteMatch[1].trim().toLowerCase();
-    const removed = await removeVisitor(name);
-    const display = name.charAt(0).toUpperCase() + name.slice(1);
-    const reply = removed
-      ? `Done — ${display} has been removed from today's visitor list.`
-      : `I couldn't find ${display} on today's list.`;
-    try {
-      await getClient().chat.postMessage({ channel, thread_ts: threadTs, text: reply });
-    } catch (err) {
-      console.error("Failed to send Slack delete confirmation:", err);
-    }
+  let parsed: ParsedMessage;
+  try {
+    parsed = await parseMessage(text);
+  } catch (err) {
+    console.error("Failed to parse Slack message intent:", err);
     return;
   }
 
-  const names = extractNames(text);
+  if (parsed.intent === "none" || parsed.names.length === 0) return;
 
-  if (names.length === 0) return;
-
-  for (const name of names) {
-    await addVisitor(name, userId);
-    console.log(`[${new Date().toISOString()}] VISITOR_ADDED | "${name}" by ${userId} via Slack`);
-  }
-
-  const display = names.map(n => n.charAt(0).toUpperCase() + n.slice(1));
+  const display = parsed.names.map(n => n.charAt(0).toUpperCase() + n.slice(1));
   const nameList = display.length === 1
     ? display[0]
     : display.slice(0, -1).join(", ") + " and " + display[display.length - 1];
-  const reply = `Got it — ${nameList} ${display.length === 1 ? "has" : "have"} been added to today's visitor list.`;
+
+  let reply: string;
+
+  if (parsed.intent === "remove") {
+    const results = await Promise.all(parsed.names.map(n => removeVisitor(n)));
+    const removed = parsed.names.filter((_, i) => results[i]);
+    const notFound = parsed.names.filter((_, i) => !results[i]);
+
+    if (removed.length > 0) {
+      const removedDisplay = removed.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(", ");
+      console.log(`[${new Date().toISOString()}] VISITOR_REMOVED | "${removedDisplay}" by ${userId} via Slack`);
+    }
+
+    if (notFound.length === 0) {
+      reply = `Done — ${nameList} ${display.length === 1 ? "has" : "have"} been removed from today's visitor list.`;
+    } else if (removed.length === 0) {
+      reply = `I couldn't find ${nameList} on today's list.`;
+    } else {
+      const notFoundDisplay = notFound.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(", ");
+      reply = `Removed what I could, but I couldn't find ${notFoundDisplay} on today's list.`;
+    }
+  } else {
+    for (const name of parsed.names) {
+      await addVisitor(name, userId);
+      console.log(`[${new Date().toISOString()}] VISITOR_ADDED | "${name}" by ${userId} via Slack`);
+    }
+    reply = `Got it — ${nameList} ${display.length === 1 ? "has" : "have"} been added to today's visitor list.`;
+  }
 
   try {
-    await getClient().chat.postMessage({
-      channel,
-      thread_ts: threadTs,
-      text: reply,
-    });
+    await getSlackClient().chat.postMessage({ channel, thread_ts: threadTs, text: reply });
   } catch (err) {
-    console.error("Failed to send Slack acknowledgement:", err);
+    console.error("Failed to send Slack reply:", err);
   }
 }
