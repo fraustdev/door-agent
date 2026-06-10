@@ -12,8 +12,11 @@ const app = express();
 // Must be registered before express.json() to preserve raw body for signature verification
 app.post("/slack/events", express.raw({ type: "application/json" }), async (req, res) => {
   const rawBody: Buffer = req.body;
+  console.log(`[SLACK] Incoming request — body length: ${rawBody?.length ?? 0}, content-type: ${req.headers["content-type"]}`);
 
-  if (!verifySlackRequest(rawBody, req.headers as Record<string, string | string[] | undefined>)) {
+  const verified = verifySlackRequest(rawBody, req.headers as Record<string, string | string[] | undefined>);
+  console.log(`[SLACK] Signature verified: ${verified}`);
+  if (!verified) {
     res.sendStatus(401);
     return;
   }
