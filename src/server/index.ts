@@ -68,6 +68,13 @@ app.put("/word", async (req, res) => {
   }
 });
 
+app.post("/slack/post-morning-message", async (req, res) => {
+  const key = process.env.DASHBOARD_API_KEY;
+  if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
+  await postMorningMessage().catch(console.error);
+  res.json({ ok: true });
+});
+
 app.get("/visitors", async (req, res) => {
   const key = process.env.DASHBOARD_API_KEY;
   if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
