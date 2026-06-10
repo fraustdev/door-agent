@@ -100,6 +100,7 @@ export async function postMorningMessage(): Promise<void> {
 }
 
 export async function handleSlackEvent(event: Record<string, unknown>): Promise<void> {
+  console.log(`[SLACK] Event received: type=${event.type} subtype=${event.subtype ?? "none"} bot_id=${event.bot_id ?? "none"}`);
   if (event.type !== "message") return;
   if (event.bot_id) return;
   if (event.subtype) return;
@@ -109,6 +110,7 @@ export async function handleSlackEvent(event: Record<string, unknown>): Promise<
 
   const userId = typeof event.user === "string" ? event.user : "unknown";
   const names = extractNames(text);
+  console.log(`[SLACK] Text: "${text}" → names extracted: [${names.join(", ") || "none"}]`);
 
   for (const name of names) {
     await addVisitor(name, userId);
