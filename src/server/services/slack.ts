@@ -1,6 +1,6 @@
 import { WebClient } from "@slack/web-api";
 import crypto from "crypto";
-import { addVisitor } from "./visitors.js";
+import { addVisitor, removeVisitor } from "./visitors.js";
 
 const STOP_WORDS = new Set([
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -14,6 +14,8 @@ const STOP_WORDS = new Set([
   "coming", "visiting", "stopping", "dropping", "bringing", "swinging", "meeting",
   "office", "door", "building", "today", "tomorrow", "later", "soon", "there", "here",
   "around", "probably", "maybe", "no", "not", "also",
+  "what", "about", "please", "her", "him", "them", "forget", "delete", "remove",
+  "list", "that", "was", "add", "from", "don't", "doesn't", "isn't", "wasn't",
 ]);
 
 export function extractNames(text: string): string[] {
@@ -115,6 +117,24 @@ export async function handleSlackEvent(event: Record<string, unknown>): Promise<
     : typeof event.ts === "string" ? event.ts : undefined;
 
   const userId = typeof event.user === "string" ? event.user : "unknown";
+
+  // Check for delete/remove intent before trying to add names
+  const deleteMatch = text.match(/(?:delete|remove)\s+([A-Za-z][a-zA-Z'-]*(?:\s+[A-Za-z][a-zA-Z'-]*)?)/i);
+  if (deleteMatch) {
+    const name = deleteMatch[1].trim().toLowerCase();
+    const removed = await removeVisitor(name);
+    const display = name.charAt(0).toUpperCase() + name.slice(1);
+    const reply = removed
+      ? `Done — ${display} has been removed from today's visitor list.`
+      : `I couldn't find ${display} on today's list.`;
+    try {
+      await getClient().chat.postMessage({ channel, thread_ts: threadTs, text: reply });
+    } catch (err) {
+      console.error("Failed to send Slack delete confirmation:", err);
+    }
+    return;
+  }
+
   const names = extractNames(text);
 
   if (names.length === 0) return;

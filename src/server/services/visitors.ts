@@ -64,3 +64,19 @@ export async function addVisitor(name: string, addedBy: string): Promise<void> {
     .insert({ name: name.toLowerCase(), added_by: addedBy, date: today });
   if (error) console.error("Failed to add visitor:", error.message);
 }
+
+export async function removeVisitor(name: string): Promise<boolean> {
+  const supabase = getClient();
+  if (!supabase) return false;
+  const { data, error } = await supabase
+    .from("visitors")
+    .delete()
+    .eq("name", name.toLowerCase())
+    .eq("date", todayInChicago())
+    .select("id");
+  if (error) {
+    console.error("Failed to remove visitor:", error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
