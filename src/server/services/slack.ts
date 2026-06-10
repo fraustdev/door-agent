@@ -82,7 +82,10 @@ export function verifySlackRequest(
 export async function postMorningMessage(): Promise<void> {
   const channelId = process.env.SLACK_CHANNEL_ID;
   const token = process.env.SLACK_BOT_TOKEN;
-  if (!channelId || !token) return;
+  if (!channelId || !token) {
+    console.error(`[SLACK] Missing env vars — SLACK_BOT_TOKEN: ${!!token}, SLACK_CHANNEL_ID: ${!!channelId}`);
+    return;
+  }
 
   const client = new WebClient(token);
   try {
