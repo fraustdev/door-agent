@@ -79,6 +79,10 @@ export function verifySlackRequest(
   }
 }
 
+function getClient(): WebClient {
+  return new WebClient(process.env.SLACK_BOT_TOKEN);
+}
+
 export async function postMorningMessage(): Promise<void> {
   const channelId = process.env.SLACK_CHANNEL_ID;
   const token = process.env.SLACK_BOT_TOKEN;
@@ -87,11 +91,10 @@ export async function postMorningMessage(): Promise<void> {
     return;
   }
 
-  const client = new WebClient(token);
   try {
-    await client.chat.postMessage({
+    await getClient().chat.postMessage({
       channel: channelId,
-      text: "Good morning! :wave: Any visitors coming in today? Reply here with their name(s) and I'll add them to the door access list.",
+      text: "Any visitors today?",
     });
     console.log(`[${new Date().toISOString()}] SLACK | Morning message posted`);
   } catch (err) {
@@ -107,11 +110,33 @@ export async function handleSlackEvent(event: Record<string, unknown>): Promise<
   const text = typeof event.text === "string" ? event.text : "";
   if (!text.trim()) return;
 
+  const channel = typeof event.channel === "string" ? event.channel : process.env.SLACK_CHANNEL_ID ?? "";
+  const threadTs = typeof event.thread_ts === "string" ? event.thread_ts
+    : typeof event.ts === "string" ? event.ts : undefined;
+
   const userId = typeof event.user === "string" ? event.user : "unknown";
   const names = extractNames(text);
+
+  if (names.length === 0) return;
 
   for (const name of names) {
     await addVisitor(name, userId);
     console.log(`[${new Date().toISOString()}] VISITOR_ADDED | "${name}" by ${userId} via Slack`);
+  }
+
+  const display = names.map(n => n.charAt(0).toUpperCase() + n.slice(1));
+  const nameList = display.length === 1
+    ? display[0]
+    : display.slice(0, -1).join(", ") + " and " + display[display.length - 1];
+  const reply = `Got it — ${nameList} ${display.length === 1 ? "has" : "have"} been added to today's visitor list.`;
+
+  try {
+    await getClient().chat.postMessage({
+      channel,
+      thread_ts: threadTs,
+      text: reply,
+    });
+  } catch (err) {
+    console.error("Failed to send Slack acknowledgement:", err);
   }
 }
