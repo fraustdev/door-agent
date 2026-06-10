@@ -51,8 +51,16 @@ export async function getVisitorRows(): Promise<VisitorRow[]> {
 export async function addVisitor(name: string, addedBy: string): Promise<void> {
   const supabase = getClient();
   if (!supabase) return;
+  const today = todayInChicago();
+  const { data } = await supabase
+    .from("visitors")
+    .select("id")
+    .eq("name", name.toLowerCase())
+    .eq("date", today)
+    .limit(1);
+  if (data && data.length > 0) return;
   const { error } = await supabase
     .from("visitors")
-    .insert({ name: name.toLowerCase(), added_by: addedBy, date: todayInChicago() });
+    .insert({ name: name.toLowerCase(), added_by: addedBy, date: today });
   if (error) console.error("Failed to add visitor:", error.message);
 }
