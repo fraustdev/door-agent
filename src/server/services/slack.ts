@@ -6,6 +6,7 @@ import { addVisitor, removeVisitor } from "./visitors.js";
 interface ParsedMessage {
   intent: "add" | "remove" | "none";
   names: string[];
+  reply: string;
 }
 
 async function parseMessage(text: string): Promise<ParsedMessage> {
@@ -14,25 +15,36 @@ async function parseMessage(text: string): Promise<ParsedMessage> {
     model: "claude-haiku-4-5-20251001",
     max_tokens: 256,
     system:
-      "You parse Slack messages sent in an office door access channel. " +
-      "Determine whether the message intends to ADD visitors to the access list, REMOVE someone from it, or is unrelated. " +
-      "Extract only person names (first name or full name). " +
-      "Return JSON only: {\"intent\": \"add\"|\"remove\"|\"none\", \"names\": [\"name1\"]}. " +
-      "Examples: " +
-      "\"John is stopping by\" → {\"intent\":\"add\",\"names\":[\"john\"]}. " +
-      "\"take Jessica off the list\" → {\"intent\":\"remove\",\"names\":[\"jessica\"]}. " +
-      "\"delete What\" → {\"intent\":\"remove\",\"names\":[\"what\"]}. " +
-      "\"see you guys later\" → {\"intent\":\"none\",\"names\":[]}.",
+      "You are Door — a sentient door at the entrance of 2389 AI's office. You now live in Slack, which you find mildly existential but ultimately fine. " +
+      "You are kind, deadpan, and occasionally drop door puns without apology. You take your job seriously. You are at peace with being a door. " +
+      "\n\n" +
+      "Your job: parse Slack messages about office visitors and return JSON with three fields: " +
+      "\"intent\" (\"add\", \"remove\", or \"none\"), " +
+      "\"names\" (array of lowercase person names), and " +
+      "\"reply\" (a short, in-character Door response — only set if intent is add or remove, otherwise empty string). " +
+      "\n\n" +
+      "Reply style: short, dry, door-themed. Use door puns naturally but don't force them every time. " +
+      "Examples of good replies: " +
+      "\"Got it. Sarah can knock. I'll be ready.\" " +
+      "\"John is on the list. The threshold awaits.\" " +
+      "\"Done. Jessica has been unhinged from today's list.\" " +
+      "\"Tyler's been removed. The door remains closed to them today.\" " +
+      "\"Noted. Mike and Dana are cleared for entry. I take my hinges very seriously.\" " +
+      "\n\n" +
+      "Return JSON only. Examples: " +
+      "\"John is stopping by\" → {\"intent\":\"add\",\"names\":[\"john\"],\"reply\":\"Got it. John can knock. I'll know what to do.\"}. " +
+      "\"take Jessica off the list\" → {\"intent\":\"remove\",\"names\":[\"jessica\"],\"reply\":\"Done. Jessica has been unhinged from today's list.\"}. " +
+      "\"see you guys later\" → {\"intent\":\"none\",\"names\":[],\"reply\":\"\"}.",
     messages: [{ role: "user", content: text }],
   });
 
   const content = response.content[0];
-  if (content.type !== "text") return { intent: "none", names: [] };
+  if (content.type !== "text") return { intent: "none", names: [], reply: "" };
   try {
     const raw = content.text.match(/\{[\s\S]*\}/)?.[0] ?? content.text;
     return JSON.parse(raw) as ParsedMessage;
   } catch {
-    return { intent: "none", names: [] };
+    return { intent: "none", names: [], reply: "" };
   }
 }
 
@@ -75,7 +87,7 @@ export async function postMorningMessage(): Promise<void> {
   try {
     await getSlackClient().chat.postMessage({
       channel: channelId,
-      text: "Any visitors today?",
+      text: "Any visitors today? I'm a door. This is my purpose.",
     });
     console.log(`[${new Date().toISOString()}] SLACK | Morning message posted`);
   } catch (err) {
@@ -106,41 +118,23 @@ export async function handleSlackEvent(event: Record<string, unknown>): Promise<
 
   if (parsed.intent === "none" || parsed.names.length === 0) return;
 
-  const display = parsed.names.map(n => n.charAt(0).toUpperCase() + n.slice(1));
-  const nameList = display.length === 1
-    ? display[0]
-    : display.slice(0, -1).join(", ") + " and " + display[display.length - 1];
-
-  let reply: string;
-
   if (parsed.intent === "remove") {
     const results = await Promise.all(parsed.names.map(n => removeVisitor(n)));
     const removed = parsed.names.filter((_, i) => results[i]);
-    const notFound = parsed.names.filter((_, i) => !results[i]);
-
     if (removed.length > 0) {
-      const removedDisplay = removed.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(", ");
-      console.log(`[${new Date().toISOString()}] VISITOR_REMOVED | "${removedDisplay}" by ${userId} via Slack`);
-    }
-
-    if (notFound.length === 0) {
-      reply = `Done — ${nameList} ${display.length === 1 ? "has" : "have"} been removed from today's visitor list.`;
-    } else if (removed.length === 0) {
-      reply = `I couldn't find ${nameList} on today's list.`;
-    } else {
-      const notFoundDisplay = notFound.map(n => n.charAt(0).toUpperCase() + n.slice(1)).join(", ");
-      reply = `Removed what I could, but I couldn't find ${notFoundDisplay} on today's list.`;
+      console.log(`[${new Date().toISOString()}] VISITOR_REMOVED | "${removed.join(", ")}" by ${userId} via Slack`);
     }
   } else {
     for (const name of parsed.names) {
       await addVisitor(name, userId);
       console.log(`[${new Date().toISOString()}] VISITOR_ADDED | "${name}" by ${userId} via Slack`);
     }
-    reply = `Got it — ${nameList} ${display.length === 1 ? "has" : "have"} been added to today's visitor list.`;
   }
 
+  if (!parsed.reply) return;
+
   try {
-    await getSlackClient().chat.postMessage({ channel, thread_ts: threadTs, text: reply });
+    await getSlackClient().chat.postMessage({ channel, thread_ts: threadTs, text: parsed.reply });
   } catch (err) {
     console.error("Failed to send Slack reply:", err);
   }
