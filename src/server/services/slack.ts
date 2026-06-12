@@ -160,7 +160,16 @@ export async function sendApprovalRequest(visitorName: string): Promise<void> {
   try {
     await getSlackClient().chat.postMessage({
       channel: channelId,
-      text: `<!here> 🚪 *${display}* is at the door and would like to come in.\nReply *allow ${visitorName.toLowerCase()}* to open the door.`,
+      text: `@here 🚪 ${display} is at the door and would like to come in. Reply allow ${visitorName.toLowerCase()} to open the door.`,
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `<!here> 🚪 *${display}* is at the door and would like to come in.\nReply *allow ${visitorName.toLowerCase()}* to open the door.`,
+          },
+        },
+      ],
     });
     console.log(`[${new Date().toISOString()}] APPROVAL_REQUESTED | "${visitorName}"`);
   } catch (err) {
