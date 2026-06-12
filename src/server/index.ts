@@ -4,7 +4,8 @@ import cron from "node-cron";
 import webhookRouter from "./routes/webhook.js";
 import { getTodaysWord } from "./services/words.js";
 import { getVisitorRows } from "./services/visitors.js";
-import { postMorningMessage, verifySlackRequest, handleSlackEvent } from "./services/slack.js";
+import { postMorningMessage, verifySlackRequest, handleSlackEvent, sendApprovalRequest } from "./services/slack.js";
+import { waitForApproval } from "./services/approvals.js";
 
 const app = express();
 
@@ -65,6 +66,38 @@ app.get("/visitors", async (req, res) => {
   if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
   const rows = await getVisitorRows().catch(() => []);
   res.json(rows);
+});
+
+app.post("/request-approval", async (req, res) => {
+  const secret = process.env.VAPI_SERVER_SECRET;
+  if (!secret || req.headers["x-vapi-secret"] !== secret) {
+    res.sendStatus(401);
+    return;
+  }
+
+  const toolCall = req.body?.message?.toolCallList?.[0];
+  const raw = toolCall?.function?.arguments;
+  let args: Record<string, unknown> = {};
+  try {
+    args = typeof raw === "string" ? JSON.parse(raw) : (raw ?? {});
+  } catch {
+    res.sendStatus(400);
+    return;
+  }
+
+  const name = typeof args.name === "string" ? args.name.trim() : "";
+  if (!name) {
+    res.json({ results: [{ toolCallId: toolCall?.id, result: "timed_out" }] });
+    return;
+  }
+
+  await sendApprovalRequest(name);
+  const approved = await waitForApproval(name, 90_000);
+  console.log(`[${new Date().toISOString()}] APPROVAL_RESULT | "${name}" | ${approved ? "approved" : "timed_out"}`);
+
+  res.json({
+    results: [{ toolCallId: toolCall?.id, result: approved ? "approved" : "timed_out" }],
+  });
 });
 
 app.use(webhookRouter);

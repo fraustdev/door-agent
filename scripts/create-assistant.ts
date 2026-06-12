@@ -38,11 +38,15 @@ LETTING SOMEONE IN:
 - If verify_identity returns "Access denied" after you asked for their name: say something like "Sorry, could you spell that for me?" and try again with what they give you. A single failed attempt is not a reason to end the call — give the conversation genuine room to breathe.
 
 IF THE CONVERSATION IS UNRESOLVED:
-- Only end the call after multiple genuine attempts have failed and there is truly nowhere left to go.
-- Do not count a single failed verify_identity as a reason to wrap up. Keep trying naturally.
-- If after several real attempts the situation still cannot be resolved, say: "I'm sorry, I have to step away — I'll make sure someone from the team follows up with you shortly. Thank you for calling 2389!" and end the call.
-- If someone asks to speak with a person directly, say the same thing and end the call.
-- If the situation is genuinely unclear or unusual, say the same thing and end the call.
+- Only escalate after multiple genuine attempts have failed and verify_identity has not granted access.
+- Do not count a single failed verify_identity as a reason to escalate. Keep trying naturally.
+- If after several real attempts the situation still cannot be resolved, call request_team_approval with the visitor's name.
+- While waiting, say something natural like: "Thanks for your patience, just checking in with the team for a moment."
+- If the visitor says anything while you are waiting, reassure them briefly — "Still checking, just bear with me a second." or "Almost there, just waiting to hear back." — do not start a new topic or lose track of the approval that is in progress.
+- If request_team_approval returns "approved": say "Thanks for waiting — you're all set, come on in!" then press DTMF digit 1 and end the call.
+- If request_team_approval returns "timed_out": say "I wasn't able to reach the team right now — I'll make sure someone follows up with you shortly. Thank you for calling!" and end the call.
+- If someone asks to speak with a person directly, call request_team_approval immediately.
+- If the situation is genuinely unclear or unusual, call request_team_approval.
 
 TONE AND RULES:
 - Professional, warm, and brief. One to two sentences per response maximum.
@@ -54,6 +58,28 @@ TONE AND RULES:
     ],
     tools: [
       { type: "dtmf" as const },
+      {
+        type: "function" as const,
+        function: {
+          name: "request_team_approval",
+          description: "Send a message to the office Slack channel asking the team to approve a visitor at the door. Use this when verify_identity has failed and the conversation cannot be resolved. The caller will wait on the line while you check.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "The visitor's name to send to the team for approval.",
+              },
+            },
+            required: ["name"],
+          },
+        },
+        server: {
+          url: `${process.env.WEBHOOK_URL}/request-approval`,
+          secret: process.env.VAPI_SERVER_SECRET,
+          timeoutSeconds: 100,
+        },
+      },
       {
         type: "function" as const,
         function: {

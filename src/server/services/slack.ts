@@ -2,9 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { WebClient } from "@slack/web-api";
 import crypto from "crypto";
 import { addVisitor, removeVisitor } from "./visitors.js";
+import { approveVisitor } from "./approvals.js";
 
 interface ParsedMessage {
-  intent: "add" | "remove" | "none";
+  intent: "add" | "remove" | "approve" | "none";
   names: string[];
   reply: string;
 }
@@ -21,7 +22,7 @@ async function parseMessage(text: string): Promise<ParsedMessage> {
       "For off-topic messages, be dryly sarcastic from a door's perspective — you only care about who comes through you, not about lunch plans or feelings. Keep it short and funny. " +
       "\n\n" +
       "Your job: parse Slack messages about office visitors and return JSON with three fields: " +
-      "\"intent\" (\"add\", \"remove\", or \"none\"), " +
+      "\"intent\" (\"add\", \"remove\", \"approve\", or \"none\"), " +
       "\"names\" (array of lowercase person names), and " +
       "\"reply\" (a short in-character response — ALWAYS set, even for none intent). " +
       "\n\n" +
@@ -36,6 +37,7 @@ async function parseMessage(text: string): Promise<ParsedMessage> {
       "Examples for visitor messages: " +
       "\"John is stopping by\" → {\"intent\":\"add\",\"names\":[\"john\"],\"reply\":\"Got it. John can knock. I'll know what to do.\"}. " +
       "\"take Jessica off the list\" → {\"intent\":\"remove\",\"names\":[\"jessica\"],\"reply\":\"Done. Jessica has been unhinged from today's list.\"}. " +
+      "\"allow jessica\" or \"let jessica in\" or \"approve jessica\" → {\"intent\":\"approve\",\"names\":[\"jessica\"],\"reply\":\"Opening the door for Jessica.\"}. " +
       "\"its gonna be fun\" → {\"intent\":\"none\",\"names\":[],\"reply\":\"I'm a door. I don't know fun. I know open and closed.\"}.",
     messages: [{ role: "user", content: text }],
   });
@@ -118,7 +120,16 @@ export async function handleSlackEvent(event: Record<string, unknown>): Promise<
     return;
   }
 
-  if (parsed.intent === "remove" && parsed.names.length > 0) {
+  if (parsed.intent === "approve" && parsed.names.length > 0) {
+    for (const name of parsed.names) {
+      const resolved = approveVisitor(name);
+      if (resolved) {
+        console.log(`[${new Date().toISOString()}] DOOR_APPROVED | "${name}" by ${userId} via Slack`);
+      } else {
+        console.log(`[${new Date().toISOString()}] DOOR_APPROVE_MISS | "${name}" — no pending request found`);
+      }
+    }
+  } else if (parsed.intent === "remove" && parsed.names.length > 0) {
     const results = await Promise.all(parsed.names.map(n => removeVisitor(n)));
     const removed = parsed.names.filter((_, i) => results[i]);
     if (removed.length > 0) {
@@ -137,5 +148,22 @@ export async function handleSlackEvent(event: Record<string, unknown>): Promise<
     await getSlackClient().chat.postMessage({ channel, thread_ts: threadTs, text: parsed.reply });
   } catch (err) {
     console.error("Failed to send Slack reply:", err);
+  }
+}
+
+export async function sendApprovalRequest(visitorName: string): Promise<void> {
+  const channelId = process.env.SLACK_CHANNEL_ID;
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!channelId || !token) return;
+
+  const display = visitorName.charAt(0).toUpperCase() + visitorName.slice(1);
+  try {
+    await getSlackClient().chat.postMessage({
+      channel: channelId,
+      text: `🚪 *${display}* is at the door and would like to come in.\nReply *allow ${visitorName.toLowerCase()}* to open the door.`,
+    });
+    console.log(`[${new Date().toISOString()}] APPROVAL_REQUESTED | "${visitorName}"`);
+  } catch (err) {
+    console.error("Failed to send Slack approval request:", err);
   }
 }
