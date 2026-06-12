@@ -6,7 +6,6 @@ export interface AccessLogEntry {
   word_expected: string | null;
   match_distance: number | null;
   granted: boolean;
-  locked_out: boolean;
   granted_by?: string | null;
   is_injection?: boolean;
 }

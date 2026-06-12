@@ -1,8 +1,0 @@
-{
-  "/api/logs/route": "/api/logs",
-  "/api/status/route": "/api/status",
-  "/api/stats/route": "/api/stats",
-  "/_not-found/page": "/_not-found",
-  "/api/word/route": "/api/word",
-  "/page": "/"
-}

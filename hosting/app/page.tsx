@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import type { AccessLogRow, StatusData, DayStat, SlackVisitor } from '../lib/types'
+import type { AccessLogRow, StatusData, DayStat, SlackVisitor, WordEntry } from '../lib/types'
 
 const WeeklyChart = dynamic(() => import('./WeeklyChart'), { ssr: false })
 
@@ -15,12 +15,6 @@ function timeAgo(iso: string): string {
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}h ago`
   return `${Math.floor(h / 24)}d ago`
-}
-
-function msToCountdown(ms: number): string {
-  const m = Math.floor(ms / 60000)
-  const s = Math.ceil((ms % 60000) / 1000)
-  return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
 function maskCaller(id: string): string {
@@ -46,23 +40,22 @@ export default function Dashboard() {
   const [status, setStatus] = useState<StatusData | null>(null)
   const [stats, setStats] = useState<DayStat[]>([])
   const [visitors, setVisitors] = useState<SlackVisitor[]>([])
+  const [weekWords, setWeekWords] = useState<WordEntry[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [connError, setConnError] = useState(false)
 
-  // Word editing
-  const [editingWord, setEditingWord] = useState(false)
-  const [wordInput, setWordInput] = useState('')
-  const [wordSaving, setWordSaving] = useState(false)
-  const [wordFeedback, setWordFeedback] = useState<'saved' | 'error' | null>(null)
-  const wordInputRef = useRef<HTMLInputElement>(null)
-
-  // Word background image
+  // Weekly word editing
+  const [editingDate, setEditingDate] = useState<string | null>(null)
+  const [editInput, setEditInput] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [showWeek, setShowWeek] = useState(false)
   const [wordImageUrl, setWordImageUrl] = useState<string | null>(null)
   const [wordImageLoaded, setWordImageLoaded] = useState(false)
   const prevWord = useRef<string | null>(null)
 
   useEffect(() => {
-    const word = status?.currentWord
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+    const word = weekWords.find(w => w.date === today)?.word ?? ''
     if (word && word !== prevWord.current) {
       prevWord.current = word
       setWordImageLoaded(false)
@@ -72,20 +65,22 @@ export default function Dashboard() {
         .then(d => { if (d.url) setWordImageUrl(d.url) })
         .catch(() => {})
     }
-  }, [status?.currentWord])
+  }, [weekWords])
 
   const refresh = useCallback(async () => {
     try {
-      const [lr, sr, str, vr] = await Promise.all([
+      const [lr, sr, str, vr, wr] = await Promise.all([
         fetch('/api/logs'),
         fetch('/api/status'),
         fetch('/api/stats'),
         fetch('/api/visitors'),
+        fetch('/api/words'),
       ])
       if (lr.ok)  setLogs(await lr.json())
       if (sr.ok)  setStatus(await sr.json())
       if (str.ok) setStats(await str.json())
       if (vr.ok)  setVisitors(await vr.json())
+      if (wr.ok)  setWeekWords(await wr.json())
       setLastUpdated(new Date())
       setConnError(false)
     } catch {
@@ -99,36 +94,29 @@ useEffect(() => {
     return () => clearInterval(id)
   }, [refresh])
 
-  const startEditWord = () => {
-    setWordInput(status?.currentWord ?? '')
-    setWordFeedback(null)
-    setEditingWord(true)
-    setTimeout(() => wordInputRef.current?.focus(), 50)
+  const todayChicago = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+
+  const startEdit = (date: string, currentWord: string) => {
+    setEditInput(currentWord)
+    setEditingDate(date)
   }
 
-  const saveWord = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    const word = wordInput.trim()
+  const saveEdit = async (date: string) => {
+    const word = editInput.trim()
     if (!word) return
-    setWordSaving(true)
-    setWordFeedback(null)
+    setEditSaving(true)
     try {
-      const res = await fetch('/api/word', {
+      const res = await fetch('/api/words', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word }),
+        body: JSON.stringify({ date, word }),
       })
       if (res.ok) {
-        setWordFeedback('saved')
-        setEditingWord(false)
+        setEditingDate(null)
         await refresh()
-      } else {
-        setWordFeedback('error')
       }
-    } catch {
-      setWordFeedback('error')
     } finally {
-      setWordSaving(false)
+      setEditSaving(false)
     }
   }
 
@@ -210,7 +198,7 @@ useEffect(() => {
 
       <div className="max-w-[1440px] mx-auto px-8 py-6 space-y-5">
         {/* Stat cards */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {[
             {
               label: 'Today',
@@ -232,13 +220,6 @@ useEffect(() => {
               sub: 'failed attempts',
               cls: 'stat-denied',
               valueColor: '#fca5a5',
-            },
-            {
-              label: 'Locked Out',
-              value: status?.lockouts.length ?? 0,
-              sub: 'active lockouts',
-              cls: 'stat-locked',
-              valueColor: '#fcec52',
             },
           ].map(({ label, value, sub, cls, valueColor }) => (
             <div key={label} className={`rounded-2xl px-5 py-5 ${cls}`}>
@@ -266,12 +247,6 @@ useEffect(() => {
                 <span className="w-2 h-2 rounded-sm" style={{ background: 'rgba(239,68,68,0.85)' }} />
                 Denied
               </span>
-              {stats.some(d => d.locked > 0) && (
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-sm" style={{ background: '#FCEC52' }} />
-                  Locked
-                </span>
-              )}
             </div>
           </div>
           <WeeklyChart stats={stats} />
@@ -283,132 +258,179 @@ useEffect(() => {
           <div className="space-y-4">
             {/* Word of the day */}
             <div
-              className="rounded-2xl overflow-hidden relative"
+              className="rounded-2xl overflow-hidden"
               style={{
-                minHeight: '190px',
                 border: '1px solid rgba(255,255,255,0.13)',
                 borderTopColor: 'rgba(255,255,255,0.26)',
                 boxShadow: '0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12)',
               }}
             >
-              {/* Background: photo or glass */}
-              {wordImageUrl ? (
-                <>
-                  <img
-                    src={wordImageUrl}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover"
-                    style={{ opacity: wordImageLoaded ? 1 : 0, transition: 'opacity 0.6s ease' }}
-                    onLoad={() => setWordImageLoaded(true)}
-                  />
-                  <div
-                    className="absolute inset-0"
-                    style={{ background: 'linear-gradient(160deg, rgba(8,8,16,0.1) 0%, rgba(8,8,16,0.88) 62%)' }}
-                  />
-                </>
-              ) : (
-                <div className="absolute inset-0 glass" style={{ borderRadius: 0 }} />
-              )}
-
-              {/* Content */}
-              <div className="relative z-10 px-6 py-6">
-                <div className="flex items-center justify-between mb-5">
-                  <p className="text-[10px] font-semibold text-white/50 uppercase tracking-[0.12em]">
-                    Word of the Day
-                  </p>
-                  {!editingWord && (
-                    <button
-                      onClick={startEditWord}
-                      className="text-[11px] text-white/40 hover:text-white/70 transition-colors px-2 py-1 rounded-lg hover:bg-white/10"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
-
-                {editingWord ? (
-                  <form onSubmit={saveWord} className="space-y-3">
-                    <input
-                      ref={wordInputRef}
-                      value={wordInput}
-                      onChange={e => setWordInput(e.target.value)}
-                      placeholder="New word…"
-                      maxLength={32}
-                      className="w-full bg-black/30 border border-white/20 rounded-xl px-4 py-3 text-[20px] font-light text-white/90 placeholder-white/25 outline-none focus:border-white/40 transition-all capitalize"
+              {/* GIF section — only this portion has the background image */}
+              <div className="relative px-6 py-6">
+                {wordImageUrl ? (
+                  <>
+                    <img
+                      src={wordImageUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ opacity: wordImageLoaded ? 1 : 0, transition: 'opacity 0.6s ease' }}
+                      onLoad={() => setWordImageLoaded(true)}
                     />
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={wordSaving || !wordInput.trim()}
-                        className="flex-1 py-2 rounded-xl text-[12px] font-medium transition-all disabled:opacity-40"
-                        style={{ background: 'rgba(59,112,128,0.5)', border: '1px solid rgba(59,112,128,0.7)', color: '#a8cfd8' }}
-                      >
-                        {wordSaving ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setEditingWord(false); setWordFeedback(null) }}
-                        className="px-4 py-2 rounded-xl text-[12px] text-white/40 hover:text-white/60 transition-colors"
-                        style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    {wordFeedback === 'error' && (
-                      <p className="text-[11px] text-red-400/80">Failed to save — check server logs</p>
-                    )}
-                  </form>
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: 'linear-gradient(160deg, rgba(8,8,16,0.15) 0%, rgba(8,8,16,0.88) 52%)' }}
+                    />
+                  </>
                 ) : (
-                  <div>
-                    {wordFeedback === 'saved' && (
-                      <p className="text-[11px] mb-2" style={{ color: '#cfffb3' }}>✓ Word updated</p>
+                  <div className="absolute inset-0 glass" style={{ borderRadius: 0 }} />
+                )}
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-5">
+                    <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em]">
+                      Word of the Day
+                    </p>
+                    {editingDate !== todayChicago() && (
+                      <button
+                        onClick={() => startEdit(todayChicago(), weekWords.find(w => w.date === todayChicago())?.word ?? '')}
+                        className="text-[11px] text-white/40 hover:text-white/70 transition-colors px-2 py-1 rounded-lg hover:bg-white/10"
+                      >
+                        Edit
+                      </button>
                     )}
-                    {status?.currentWord ? (
-                      <>
-                        <p
-                          className="text-[38px] font-[300] leading-none capitalize text-white"
-                          style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
+                  </div>
+
+                  {editingDate === todayChicago() ? (
+                    <form onSubmit={e => { e.preventDefault(); saveEdit(todayChicago()) }} className="space-y-3">
+                      <input
+                        autoFocus
+                        value={editInput}
+                        onChange={e => setEditInput(e.target.value)}
+                        placeholder="New word…"
+                        maxLength={32}
+                        className="w-full bg-black/30 border border-white/20 rounded-xl px-4 py-3 text-[20px] font-light text-white/90 placeholder-white/25 outline-none focus:border-white/40 transition-all capitalize"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={editSaving || !editInput.trim()}
+                          className="flex-1 py-2 rounded-xl text-[12px] font-medium transition-all disabled:opacity-40"
+                          style={{ background: 'rgba(59,112,128,0.5)', border: '1px solid rgba(59,112,128,0.7)', color: '#a8cfd8' }}
                         >
-                          {status.currentWord}
+                          {editSaving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingDate(null)}
+                          className="px-4 py-2 rounded-xl text-[12px] text-white/40 hover:text-white/60 transition-colors"
+                          style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (() => {
+                    const todayWord = weekWords.find(w => w.date === todayChicago())?.word ?? ''
+                    return todayWord ? (
+                      <>
+                        <p className="text-[38px] font-[300] leading-none capitalize text-white">
+                          {todayWord}
                         </p>
                         <p className="text-[11px] text-white/40 mt-4">
                           Callers must speak this word to enter
                         </p>
                       </>
                     ) : (
-                      <p className="text-[13px] text-white/25 italic">Not available</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+                      <p className="text-[13px] text-white/25 italic">No word set for today</p>
+                    )
+                  })()}
 
-            {/* Active lockouts */}
-            <div className="rounded-2xl glass px-6 py-6">
-              <p className="text-[10px] font-semibold text-white/45 uppercase tracking-[0.12em] mb-5">
-                Active Lockouts
-              </p>
-              {!status || status.lockouts.length === 0 ? (
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className="w-2 h-2 rounded-full bg-emerald-400"
-                    style={{ boxShadow: '0 0 8px rgba(16,185,129,0.7)' }}
-                  />
-                  <span className="text-[13px] text-white/45">All clear</span>
+                  {/* This week toggle */}
+                  <button
+                    onClick={() => setShowWeek(v => !v)}
+                    className="mt-5 flex items-center gap-1.5 text-[11px] text-white/30 hover:text-white/55 transition-colors"
+                  >
+                    <svg
+                      className={`w-3 h-3 transition-transform duration-200 ${showWeek ? 'rotate-180' : ''}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span>This week</span>
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {status.lockouts.map(l => (
-                    <div key={l.callerId} className="glass-row rounded-xl px-4 py-3">
-                      <p className="text-[13px] text-white/80 font-mono">{maskCaller(l.callerId)}</p>
-                      <p className="text-[11px] text-amber-400/80 mt-1">
-                        {msToCountdown(l.msRemaining)} remaining
-                      </p>
-                    </div>
-                  ))}
+              </div>
+
+              {/* Week dropdown — sits below the GIF section, plain dark background */}
+              {showWeek && (
+                <div className="px-6 pb-5" style={{ background: 'rgba(8,8,16,0.55)' }}>
+                  <div className="border-t border-white/[0.06] pt-3 space-y-1">
+                    {weekWords.map(({ date, word }) => {
+                      const isToday = date === todayChicago()
+                      const d = new Date(date + 'T12:00:00')
+                      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' })
+                      const monthDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      const isEditing = editingDate === date && !isToday
+                      return (
+                        <div
+                          key={date}
+                          className={`rounded-xl px-4 py-2.5 flex items-center gap-3 transition-colors ${
+                            isToday ? 'bg-white/[0.07] border border-white/10' : 'hover:bg-white/[0.03]'
+                          }`}
+                        >
+                          <div className="w-14 shrink-0">
+                            <p className={`text-[11px] font-semibold ${isToday ? 'text-white/70' : 'text-white/40'}`}>{dayName}</p>
+                            <p className="text-[10px] text-white/25 mt-0.5">{monthDay}</p>
+                          </div>
+                          {isEditing ? (
+                            <form onSubmit={e => { e.preventDefault(); saveEdit(date) }} className="flex-1 flex gap-2 items-center">
+                              <input
+                                autoFocus
+                                value={editInput}
+                                onChange={e => setEditInput(e.target.value)}
+                                placeholder="Enter word…"
+                                maxLength={32}
+                                className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-1.5 text-[13px] text-white/90 placeholder-white/25 outline-none focus:border-white/40 transition-all"
+                              />
+                              <button
+                                type="submit"
+                                disabled={editSaving || !editInput.trim()}
+                                className="text-[11px] px-3 py-1.5 rounded-lg disabled:opacity-40 shrink-0"
+                                style={{ background: 'rgba(59,112,128,0.5)', border: '1px solid rgba(59,112,128,0.7)', color: '#a8cfd8' }}
+                              >
+                                {editSaving ? '…' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingDate(null)}
+                                className="text-[11px] px-2.5 py-1.5 rounded-lg text-white/35 hover:text-white/60 shrink-0"
+                                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                              >
+                                ✕
+                              </button>
+                            </form>
+                          ) : (
+                            <>
+                              <p className={`flex-1 text-[13px] capitalize ${word ? (isToday ? 'text-white/70 font-medium' : 'text-white/60') : 'text-white/20 italic'}`}>
+                                {word || '—'}
+                              </p>
+                              {!isToday && (
+                                <button
+                                  onClick={() => startEdit(date, word)}
+                                  className="text-[11px] text-white/25 hover:text-white/55 transition-colors px-2 py-1 rounded-lg hover:bg-white/[0.06] shrink-0"
+                                >
+                                  Edit
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>
+
 
             {/* Today's visitors — from Slack */}
             <div className="rounded-2xl glass px-6 py-6">
@@ -454,15 +476,13 @@ useEffect(() => {
                     {/* Badge */}
                     <span
                       className={`text-[9px] font-bold px-2.5 py-1 rounded-full shrink-0 tracking-[0.1em] uppercase ${
-                        row.locked_out ? 'badge-locked'
-                        : row.is_injection ? 'badge-injection'
+                        row.is_injection ? 'badge-injection'
                         : row.granted && row.granted_by === 'visitor' ? 'badge-visitor'
                         : row.granted ? 'badge-granted'
                         : 'badge-denied'
                       }`}
                     >
-                      {row.locked_out ? 'Locked'
-                        : row.is_injection ? 'Injection'
+                      {row.is_injection ? 'Injection'
                         : row.granted && row.granted_by === 'visitor' ? 'Visitor'
                         : row.granted ? 'Granted'
                         : 'Denied'}
@@ -479,7 +499,7 @@ useEffect(() => {
                     </span>
 
                     {/* Expected + distance (only show on denied) */}
-                    {!row.granted && !row.locked_out && row.word_expected && (
+                    {!row.granted && row.word_expected && (
                       <span className="text-[11px] text-white/28 shrink-0 hidden xl:flex items-center gap-1.5">
                         {row.match_distance != null && row.match_distance > 0 && (
                           <span className="text-amber-400/60 font-mono">Δ{row.match_distance}</span>

@@ -11,14 +11,8 @@ export interface AccessLogRow {
   is_injection: boolean
 }
 
-export interface LockoutInfo {
-  callerId: string
-  msRemaining: number
-}
-
 export interface StatusData {
   currentWord: string | null
-  lockouts: LockoutInfo[]
 }
 
 export interface SlackVisitor {
@@ -27,6 +21,11 @@ export interface SlackVisitor {
   name: string
   added_by: string | null
   date: string
+}
+
+export interface WordEntry {
+  date: string
+  word: string
 }
 
 export interface DayStat {

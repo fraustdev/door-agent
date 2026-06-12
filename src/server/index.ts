@@ -2,8 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cron from "node-cron";
 import webhookRouter from "./routes/webhook.js";
-import { registerWatch, getTodaysWord, setTodaysWord } from "./services/sheets.js";
-import { getActiveLockouts } from "./services/rateLimiter.js";
+import { getTodaysWord } from "./services/words.js";
 import { getVisitorRows } from "./services/visitors.js";
 import { postMorningMessage, verifySlackRequest, handleSlackEvent } from "./services/slack.js";
 
@@ -50,23 +49,9 @@ app.get("/status", async (req, res) => {
     return;
   }
   const currentWord = await getTodaysWord().catch(() => null);
-  res.json({ currentWord, lockouts: getActiveLockouts() });
+  res.json({ currentWord });
 });
 
-app.put("/word", async (req, res) => {
-  const key = process.env.DASHBOARD_API_KEY;
-  if (key && req.headers["x-dashboard-key"] !== key) { res.sendStatus(401); return; }
-  const word: string = typeof req.body?.word === "string" ? req.body.word.trim() : "";
-  if (!word) { res.status(400).json({ error: "word is required" }); return; }
-  try {
-    await setTodaysWord(word);
-    console.log(`[${new Date().toISOString()}] WORD_UPDATED | "${word}" via dashboard`);
-    res.json({ ok: true, word });
-  } catch (err) {
-    console.error("setTodaysWord failed:", err);
-    res.status(500).json({ error: String(err) });
-  }
-});
 
 app.post("/slack/post-morning-message", async (req, res) => {
   const key = process.env.DASHBOARD_API_KEY;
@@ -87,14 +72,7 @@ app.use(webhookRouter);
 const PORT = process.env.PORT ?? 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  registerWatch().catch((err) => console.error("Sheets watch registration failed:", err));
 });
-
-// Renew 1 day before the 7-day Google expiry
-const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
-setInterval(() => {
-  registerWatch().catch((err) => console.error("Sheets watch renewal failed:", err));
-}, SIX_DAYS_MS);
 
 // Post morning visitor check message at 8am Chicago time
 cron.schedule("0 8 * * *", () => {

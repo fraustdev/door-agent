@@ -1,4 +1,4 @@
-import { getTodaysWord } from "./sheets.js";
+import { getTodaysWord } from "./words.js";
 import { getTodaysVisitors } from "./visitors.js";
 
 const INJECTION_PATTERNS = [
